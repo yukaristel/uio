@@ -18,14 +18,14 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
                 <!-- Dashboard -->
                 <li class="nav-item">
                     <a class="nav-link <?php echo $current_page == 'dashboard' ? 'active' : ''; ?>" href="index.php?page=dashboard">
-                        <i class="bi bi-speedometer2"></i> Dashboard
+                        <i class="bi bi-speedometer2"></i>
                     </a>
                 </li>
 
                 <!-- Master Data -->
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-database"></i> Master Data
+                        <i class="bi bi-database"></i>
                     </a>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="index.php?page=list_karyawan">
@@ -46,14 +46,14 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
                 <!-- Pembelian -->
                 <li class="nav-item">
                     <a class="nav-link <?php echo $current_page == 'pembelian_bahan' ? 'active' : ''; ?>" href="index.php?page=pembelian_bahan">
-                        <i class="bi bi-cart-plus"></i> Pembelian Bahan
+                        <i class="bi bi-cart-plus"></i>
                     </a>
                 </li>
 
                 <!-- Transaksi -->
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-cash-coin"></i> Transaksi
+                        <i class="bi bi-cash-coin"></i>
                     </a>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="index.php?page=buat_transaksi">
@@ -68,7 +68,7 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
                 <!-- Stock Management -->
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-boxes"></i> Stok
+                        <i class="bi bi-boxes"></i>
                     </a>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="index.php?page=list_movement">
@@ -87,7 +87,7 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
                 <!-- Kas -->
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-wallet2"></i> Kas
+                        <i class="bi bi-wallet2"></i>
                     </a>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="index.php?page=dashboard_kas">
@@ -108,7 +108,7 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
                 <!-- Laporan -->
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-file-earmark-text"></i> Laporan
+                        <i class="bi bi-file-earmark-text"></i>
                     </a>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="index.php?page=laporan_harian">
