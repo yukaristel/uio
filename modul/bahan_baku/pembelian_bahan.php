@@ -1,6 +1,6 @@
 ﻿<?php
 /**
- * FORM PEMBELIAN BAHAN BAKU
+ * FORM PEMBELIAN BAHAN BAKU (Harga Total)
  * Step 29/64 (45.3%)
  */
 
@@ -79,10 +79,10 @@ $bahan_id_selected = isset($_GET['bahan_id']) ? intval($_GET['bahan_id']) : 0;
 
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="form-label">Harga Beli per Satuan *</label>
-                                <input type="number" class="form-control" name="harga_beli_satuan" 
-                                       id="hargaBeli" required min="0" step="100" placeholder="0">
-                                <small class="text-muted">Harga per <span id="satuanHargaBeli">-</span></small>
+                                <label class="form-label">Total Harga Beli *</label>
+                                <input type="number" class="form-control" name="total_harga_beli" 
+                                       id="totalHargaBeli" required min="0" step="100" placeholder="0">
+                                <small class="text-muted">Total harga untuk <span id="jumlahInfo">0</span> <span id="satuanInfo">-</span></small>
                             </div>
                         </div>
 
@@ -134,13 +134,13 @@ $bahan_id_selected = isset($_GET['bahan_id']) ? intval($_GET['bahan_id']) : 0;
                     <h5 id="displayJumlah">0</h5>
                 </div>
                 <div class="mb-3">
-                    <label class="text-muted">Harga per Satuan:</label>
-                    <h5 id="displayHarga">Rp 0</h5>
-                </div>
-                <hr>
-                <div class="mb-3">
                     <label class="text-muted">Total Harga:</label>
                     <h4 class="text-primary" id="displayTotal">Rp 0</h4>
+                </div>
+                <div class="mb-3">
+                    <label class="text-muted">Harga per Satuan:</label>
+                    <h5 id="displayHargaSatuan">Rp 0</h5>
+                    <small class="text-muted">(otomatis dihitung)</small>
                 </div>
                 <hr>
                 <div class="mb-3">
@@ -166,8 +166,9 @@ $bahan_id_selected = isset($_GET['bahan_id']) ? intval($_GET['bahan_id']) : 0;
             </div>
             <div class="card-body">
                 <ul class="mb-0">
+                    <li>Input <strong>TOTAL HARGA</strong> pembelian</li>
+                    <li>Harga per satuan dihitung otomatis</li>
                     <li>Sistem menggunakan <strong>Weighted Average</strong></li>
-                    <li>Harga rata-rata otomatis dihitung</li>
                     <li>Kas keluar tercatat otomatis</li>
                     <li>Stock movement tercatat otomatis</li>
                 </ul>
@@ -195,7 +196,7 @@ document.getElementById('bahanSelect').addEventListener('change', function() {
         document.getElementById('satuanHarga').textContent = satuan;
         
         document.getElementById('satuanJumlah').textContent = satuan;
-        document.getElementById('satuanHargaBeli').textContent = satuan;
+        document.getElementById('satuanInfo').textContent = satuan;
         
         hitung();
     } else {
@@ -203,28 +204,36 @@ document.getElementById('bahanSelect').addEventListener('change', function() {
     }
 });
 
-document.getElementById('jumlahBeli').addEventListener('input', hitung);
-document.getElementById('hargaBeli').addEventListener('input', hitung);
+document.getElementById('jumlahBeli').addEventListener('input', function() {
+    const jumlah = parseFloat(this.value) || 0;
+    const satuan = document.getElementById('bahanSelect').options[document.getElementById('bahanSelect').selectedIndex].dataset.satuan || '-';
+    document.getElementById('jumlahInfo').textContent = jumlah.toFixed(2);
+    hitung();
+});
+
+document.getElementById('totalHargaBeli').addEventListener('input', hitung);
 
 function hitung() {
     const jumlah = parseFloat(document.getElementById('jumlahBeli').value) || 0;
-    const harga = parseFloat(document.getElementById('hargaBeli').value) || 0;
+    const totalHarga = parseFloat(document.getElementById('totalHargaBeli').value) || 0;
     const satuan = document.getElementById('bahanSelect').options[document.getElementById('bahanSelect').selectedIndex].dataset.satuan || '-';
     
-    const total = jumlah * harga;
+    // Hitung harga per satuan
+    const hargaPerSatuan = jumlah > 0 ? totalHarga / jumlah : 0;
+    
     const stokBaru = stokSekarang + jumlah;
     
     // Hitung weighted average
     const nilaiLama = stokSekarang * hargaSekarang;
-    const nilaiBaru = jumlah * harga;
+    const nilaiBaru = totalHarga;
     const totalNilai = nilaiLama + nilaiBaru;
-    const hargaBaru = stokBaru > 0 ? totalNilai / stokBaru : harga;
+    const hargaBaru = stokBaru > 0 ? totalNilai / stokBaru : hargaPerSatuan;
     
-    const saldoSesudah = saldoKas - total;
+    const saldoSesudah = saldoKas - totalHarga;
     
     document.getElementById('displayJumlah').textContent = jumlah.toFixed(2) + ' ' + satuan;
-    document.getElementById('displayHarga').textContent = formatRupiah(harga) + '/' + satuan;
-    document.getElementById('displayTotal').textContent = formatRupiah(total);
+    document.getElementById('displayTotal').textContent = formatRupiah(totalHarga);
+    document.getElementById('displayHargaSatuan').textContent = formatRupiah(hargaPerSatuan) + '/' + satuan;
     document.getElementById('displayStokBaru').textContent = stokBaru.toFixed(2) + ' ' + satuan;
     document.getElementById('displayHargaBaru').textContent = formatRupiah(hargaBaru) + '/' + satuan;
     document.getElementById('displaySaldoSesudah').textContent = formatRupiah(saldoSesudah);
@@ -233,7 +242,7 @@ function hitung() {
     const alertSaldo = document.getElementById('alertSaldo');
     const btnSubmit = document.getElementById('btnSubmit');
     
-    if (total > saldoKas) {
+    if (totalHarga > saldoKas) {
         alertSaldo.style.display = 'block';
         btnSubmit.disabled = true;
     } else {

@@ -1,6 +1,6 @@
 <?php
 /**
- * PROSES CRUD BAHAN BAKU
+ * PROSES CRUD BAHAN BAKU (Harga Total)
  * Step 16/64 (25.0%)
  */
 
@@ -45,7 +45,7 @@ function createBahan() {
     $satuan = $_POST['satuan'];
     $stok_tersedia = floatval($_POST['stok_tersedia']);
     $stok_minimum = floatval($_POST['stok_minimum']);
-    $harga_beli_per_satuan = floatval($_POST['harga_beli_per_satuan']);
+    $total_harga_awal = floatval($_POST['total_harga_awal']); // UBAH: input total harga
     
     // Validasi
     if (empty($kode_bahan) || empty($nama_bahan) || empty($satuan)) {
@@ -54,11 +54,15 @@ function createBahan() {
         exit;
     }
     
-    if ($harga_beli_per_satuan <= 0) {
-        $_SESSION['error'] = 'Harga beli harus lebih dari 0!';
+    // Validasi: Jika ada stok awal, harus ada harga
+    if ($stok_tersedia > 0 && $total_harga_awal <= 0) {
+        $_SESSION['error'] = 'Jika stok awal > 0, total harga harus diisi!';
         header('Location: ../index.php?page=tambah_bahan');
         exit;
     }
+    
+    // Hitung harga per satuan
+    $harga_beli_per_satuan = $stok_tersedia > 0 ? $total_harga_awal / $stok_tersedia : 0;
     
     // Cek kode duplikat
     $cek = fetchOne("SELECT id FROM bahan_baku WHERE kode_bahan = ?", [$kode_bahan]);
@@ -76,7 +80,6 @@ function createBahan() {
         // Jika stok_tersedia > 0, catat stock movement
         if ($stok_tersedia > 0) {
             $bahan_id = $result['insert_id'];
-            $total_nilai = $stok_tersedia * $harga_beli_per_satuan;
             
             $sql_movement = "INSERT INTO stock_movement 
                 (bahan_id, jenis_pergerakan, jumlah, satuan, harga_per_satuan, total_nilai, 
@@ -85,7 +88,7 @@ function createBahan() {
             
             execute($sql_movement, [
                 $bahan_id, $stok_tersedia, $satuan, $harga_beli_per_satuan, 
-                $total_nilai, $stok_tersedia, $_SESSION['user_id']
+                $total_harga_awal, $stok_tersedia, $_SESSION['user_id']
             ]);
         }
         
@@ -112,17 +115,11 @@ function updateBahan() {
     $nama_bahan = trim($_POST['nama_bahan']);
     $satuan = $_POST['satuan'];
     $stok_minimum = floatval($_POST['stok_minimum']);
-    $harga_beli_per_satuan = floatval($_POST['harga_beli_per_satuan']);
+    // Harga tidak diupdate di form edit, hanya via pembelian
     
     // Validasi
     if (empty($kode_bahan) || empty($nama_bahan) || empty($satuan)) {
         $_SESSION['error'] = 'Kode bahan, nama bahan, dan satuan harus diisi!';
-        header('Location: ../index.php?page=edit_bahan&id=' . $id);
-        exit;
-    }
-    
-    if ($harga_beli_per_satuan <= 0) {
-        $_SESSION['error'] = 'Harga beli harus lebih dari 0!';
         header('Location: ../index.php?page=edit_bahan&id=' . $id);
         exit;
     }
@@ -135,11 +132,11 @@ function updateBahan() {
         exit;
     }
     
-    // Note: stok_tersedia tidak diupdate di sini, hanya via pembelian/transaksi/opname
+    // Note: stok_tersedia dan harga tidak diupdate di sini, hanya via pembelian/transaksi/opname
     $sql = "UPDATE bahan_baku 
-            SET kode_bahan = ?, nama_bahan = ?, satuan = ?, stok_minimum = ?, harga_beli_per_satuan = ? 
+            SET kode_bahan = ?, nama_bahan = ?, satuan = ?, stok_minimum = ? 
             WHERE id = ?";
-    $result = execute($sql, [$kode_bahan, $nama_bahan, $satuan, $stok_minimum, $harga_beli_per_satuan, $id]);
+    $result = execute($sql, [$kode_bahan, $nama_bahan, $satuan, $stok_minimum, $id]);
     
     if ($result['success']) {
         $_SESSION['success'] = 'Bahan baku berhasil diupdate!';

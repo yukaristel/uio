@@ -1,6 +1,6 @@
 <?php
 /**
- * PROSES PEMBELIAN BAHAN + WEIGHTED AVERAGE
+ * PROSES PEMBELIAN BAHAN + WEIGHTED AVERAGE (Harga Total)
  * Step 17/64 (26.6%)
  */
 
@@ -36,16 +36,19 @@ function createPembelian() {
     
     $bahan_id = intval($_POST['bahan_id']);
     $jumlah_beli = floatval($_POST['jumlah_beli']);
-    $harga_beli_satuan = floatval($_POST['harga_beli_satuan']);
+    $total_harga_beli = floatval($_POST['total_harga_beli']); // UBAH: input total harga
     $supplier = trim($_POST['supplier']);
     $tanggal_beli = $_POST['tanggal_beli'];
     
     // Validasi
-    if ($bahan_id == 0 || $jumlah_beli <= 0 || $harga_beli_satuan <= 0 || empty($tanggal_beli)) {
+    if ($bahan_id == 0 || $jumlah_beli <= 0 || $total_harga_beli <= 0 || empty($tanggal_beli)) {
         $_SESSION['error'] = 'Semua field harus diisi dengan benar!';
         header('Location: ../index.php?page=pembelian_bahan');
         exit;
     }
+    
+    // Hitung harga per satuan dari total
+    $harga_beli_satuan = $total_harga_beli / $jumlah_beli;
     
     // Ambil data bahan
     $bahan = fetchOne("SELECT * FROM bahan_baku WHERE id = ?", [$bahan_id]);
@@ -55,12 +58,10 @@ function createPembelian() {
         exit;
     }
     
-    $total_harga = $jumlah_beli * $harga_beli_satuan;
-    
     // Cek saldo kas cukup
     $saldo_kas = getSaldoKasTerakhir();
-    if ($saldo_kas < $total_harga) {
-        $_SESSION['error'] = 'Saldo kas tidak cukup! Saldo: ' . formatRupiah($saldo_kas) . ', Dibutuhkan: ' . formatRupiah($total_harga);
+    if ($saldo_kas < $total_harga_beli) {
+        $_SESSION['error'] = 'Saldo kas tidak cukup! Saldo: ' . formatRupiah($saldo_kas) . ', Dibutuhkan: ' . formatRupiah($total_harga_beli);
         header('Location: ../index.php?page=pembelian_bahan');
         exit;
     }
@@ -76,7 +77,7 @@ function createPembelian() {
             VALUES (?, ?, ?, ?, ?, ?, ?)";
         
         $result = execute($sql_pembelian, [
-            $bahan_id, $jumlah_beli, $harga_beli_satuan, $total_harga, 
+            $bahan_id, $jumlah_beli, $harga_beli_satuan, $total_harga_beli, 
             $supplier, $tanggal_beli, $_SESSION['user_id']
         ]);
         
@@ -91,7 +92,7 @@ function createPembelian() {
         $harga_lama = $bahan['harga_beli_per_satuan'];
         
         $nilai_lama = $stok_lama * $harga_lama;
-        $nilai_baru = $jumlah_beli * $harga_beli_satuan;
+        $nilai_baru = $total_harga_beli; // langsung pakai total harga
         $total_nilai = $nilai_lama + $nilai_baru;
         $total_stok = $stok_lama + $jumlah_beli;
         
@@ -120,7 +121,7 @@ function createPembelian() {
         
         $keterangan = "Pembelian dari " . ($supplier ?: 'Supplier');
         $result_movement = execute($sql_movement, [
-            $bahan_id, $jumlah_beli, $bahan['satuan'], $harga_beli_satuan, $total_harga,
+            $bahan_id, $jumlah_beli, $bahan['satuan'], $harga_beli_satuan, $total_harga_beli,
             $stok_lama, $total_stok, $pembelian_id, $keterangan, $_SESSION['user_id']
         ]);
         
@@ -131,7 +132,7 @@ function createPembelian() {
         // 5. Catat kas keluar OTOMATIS
         $no_kas = generateNoKas();
         $saldo_sebelum = $saldo_kas;
-        $saldo_sesudah = $saldo_sebelum - $total_harga;
+        $saldo_sesudah = $saldo_sebelum - $total_harga_beli;
         
         $sql_kas = "INSERT INTO kas_umum 
             (no_transaksi_kas, tanggal_transaksi, jenis_transaksi, kategori, nominal, 
@@ -140,7 +141,7 @@ function createPembelian() {
         
         $keterangan_kas = "Pembelian " . $bahan['nama_bahan'] . " (" . $jumlah_beli . " " . $bahan['satuan'] . ")";
         $result_kas = execute($sql_kas, [
-            $no_kas, $total_harga, $saldo_sebelum, $saldo_sesudah, 
+            $no_kas, $total_harga_beli, $saldo_sebelum, $saldo_sesudah, 
             $pembelian_id, $keterangan_kas, $_SESSION['user_id']
         ]);
         
@@ -149,7 +150,7 @@ function createPembelian() {
         }
         
         // 6. Update saldo_kas harian
-        updateSaldoKasHarian('keluar', $total_harga);
+        updateSaldoKasHarian('keluar', $total_harga_beli);
         
         // COMMIT
         $conn->commit();
