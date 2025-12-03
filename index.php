@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * APLIKASI RUMAH MAKAN - INDEX.PHP
  * File utama untuk routing aplikasi
@@ -60,7 +60,7 @@ $user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'karyawan';
         }
         
         // Content area
-        echo '<div class="container-fluid mt-4">';
+        echo '<div id="content" class="container-fluid mt-4">';
         include 'modul/layouts/content.php';
         echo '</div>';
         
@@ -112,5 +112,17 @@ $user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'karyawan';
             window.print();
         }
     </script>
+
+    <script>
+window.onload = function() {
+    const target = document.getElementById('content'); 
+    if (target) {
+        target.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        console.warn("Elemen #content tidak ditemukan");
+    }
+}
+</script>
+
 </body>
 </html>
