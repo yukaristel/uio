@@ -4,8 +4,8 @@
 -- ============================================
 
 -- Create Database
-CREATE DATABASE IF NOT EXISTS rumah_makan;
-USE rumah_makan;
+CREATE DATABASE IF NOT EXISTS uio;
+USE uio;
 
 -- ============================================
 -- 1. TABLE: users (Karyawan)
