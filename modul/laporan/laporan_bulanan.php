@@ -1,6 +1,6 @@
 <?php
 /**
- * LAPORAN BULANAN
+ * LAPORAN BULANAN (FIXED NULL HANDLING)
  * Step 58/64 (90.6%)
  */
 
@@ -24,9 +24,9 @@ $summary_per_hari = fetchAll("
     SELECT 
         DATE(tanggal_transaksi) as tanggal,
         COUNT(*) as total_transaksi,
-        SUM(total_harga) as total_pendapatan,
-        SUM(total_modal) as total_modal,
-        SUM(total_keuntungan) as total_keuntungan
+        COALESCE(SUM(total_harga), 0) as total_pendapatan,
+        COALESCE(SUM(total_modal), 0) as total_modal,
+        COALESCE(SUM(total_keuntungan), 0) as total_keuntungan
     FROM transaksi_penjualan
     WHERE DATE_FORMAT(tanggal_transaksi, '%Y-%m') = ?
     GROUP BY DATE(tanggal_transaksi)
@@ -38,8 +38,8 @@ $menu_terlaris = fetchAll("
     SELECT 
         m.nama_menu, m.harga_jual,
         SUM(dt.jumlah) as total_terjual,
-        SUM(dt.subtotal) as total_pendapatan,
-        SUM(dt.subtotal - dt.subtotal_modal) as total_keuntungan
+        COALESCE(SUM(dt.subtotal), 0) as total_pendapatan,
+        COALESCE(SUM(dt.subtotal - dt.subtotal_modal), 0) as total_keuntungan
     FROM detail_transaksi dt
     JOIN menu_makanan m ON dt.menu_id = m.id
     JOIN transaksi_penjualan tp ON dt.transaksi_id = tp.id
@@ -53,7 +53,7 @@ $menu_terlaris = fetchAll("
 $pembelian_bulanan = fetchOne("
     SELECT 
         COUNT(*) as total_pembelian,
-        SUM(total_harga) as total_nilai
+        COALESCE(SUM(total_harga), 0) as total_nilai
     FROM pembelian_bahan
     WHERE DATE_FORMAT(tanggal_beli, '%Y-%m') = ?
 ", [$bulan]);
@@ -62,23 +62,28 @@ $pembelian_bulanan = fetchOne("
 $stock_movement_bulanan = fetchOne("
     SELECT 
         COUNT(*) as total_movement,
-        SUM(CASE WHEN jenis_pergerakan IN ('rusak', 'tumpah', 'expired', 'hilang') THEN total_nilai ELSE 0 END) as total_kerugian
+        COALESCE(SUM(CASE WHEN jenis_pergerakan IN ('rusak', 'tumpah', 'expired', 'hilang') THEN total_nilai ELSE 0 END), 0) as total_kerugian
     FROM stock_movement
     WHERE DATE_FORMAT(created_at, '%Y-%m') = ?
 ", [$bulan]);
 
-// Kas Bulanan
-$kas_bulanan = fetchOne("
+// Kas Bulanan - Ensure default values if query returns null
+$kas_bulanan_result = fetchOne("
     SELECT 
-        SUM(total_masuk) as total_masuk,
-        SUM(total_keluar) as total_keluar
+        COALESCE(SUM(total_masuk), 0) as total_masuk,
+        COALESCE(SUM(total_keluar), 0) as total_keluar
     FROM saldo_kas
     WHERE DATE_FORMAT(tanggal, '%Y-%m') = ?
 ", [$bulan]);
 
+$kas_bulanan = [
+    'total_masuk' => floatval($kas_bulanan_result['total_masuk'] ?? 0),
+    'total_keluar' => floatval($kas_bulanan_result['total_keluar'] ?? 0)
+];
+
 // Saldo Awal Bulan
 $saldo_awal_bulan = fetchOne("
-    SELECT saldo_awal 
+    SELECT COALESCE(saldo_awal, 0) as saldo_awal 
     FROM saldo_kas 
     WHERE tanggal >= ? 
     ORDER BY tanggal ASC 
@@ -87,12 +92,30 @@ $saldo_awal_bulan = fetchOne("
 
 // Saldo Akhir Bulan
 $saldo_akhir_bulan = fetchOne("
-    SELECT saldo_akhir 
+    SELECT COALESCE(saldo_akhir, 0) as saldo_akhir 
     FROM saldo_kas 
     WHERE tanggal <= LAST_DAY(?)
     ORDER BY tanggal DESC 
     LIMIT 1
 ", ["$bulan-01"]);
+
+// Ensure all values are numeric (not null)
+$summary_bulanan['total_transaksi'] = intval($summary_bulanan['total_transaksi'] ?? 0);
+$summary_bulanan['total_pendapatan'] = floatval($summary_bulanan['total_pendapatan'] ?? 0);
+$summary_bulanan['total_modal'] = floatval($summary_bulanan['total_modal'] ?? 0);
+$summary_bulanan['total_keuntungan'] = floatval($summary_bulanan['total_keuntungan'] ?? 0);
+
+$pembelian_bulanan['total_pembelian'] = intval($pembelian_bulanan['total_pembelian'] ?? 0);
+$pembelian_bulanan['total_nilai'] = floatval($pembelian_bulanan['total_nilai'] ?? 0);
+
+$stock_movement_bulanan['total_movement'] = intval($stock_movement_bulanan['total_movement'] ?? 0);
+$stock_movement_bulanan['total_kerugian'] = floatval($stock_movement_bulanan['total_kerugian'] ?? 0);
+
+$kas_bulanan['total_masuk'] = floatval($kas_bulanan['total_masuk'] ?? 0);
+$kas_bulanan['total_keluar'] = floatval($kas_bulanan['total_keluar'] ?? 0);
+
+$saldo_awal = floatval($saldo_awal_bulan['saldo_awal'] ?? 0);
+$saldo_akhir = floatval($saldo_akhir_bulan['saldo_akhir'] ?? 0);
 
 $nama_bulan = [
     '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', '04' => 'April',
@@ -339,7 +362,7 @@ $nama_bulan = [
             <div class="card-body">
                 <div class="d-flex justify-content-between mb-2">
                     <span>Saldo Awal Bulan:</span>
-                    <strong><?php echo formatRupiah($saldo_awal_bulan ? $saldo_awal_bulan['saldo_awal'] : 0); ?></strong>
+                    <strong><?php echo formatRupiah($saldo_awal); ?></strong>
                 </div>
                 <div class="d-flex justify-content-between mb-2 text-success">
                     <span>Total Kas Masuk:</span>
@@ -352,7 +375,7 @@ $nama_bulan = [
                 <hr>
                 <div class="d-flex justify-content-between">
                     <strong>Saldo Akhir Bulan:</strong>
-                    <h5 class="mb-0"><strong><?php echo formatRupiah($saldo_akhir_bulan ? $saldo_akhir_bulan['saldo_akhir'] : 0); ?></strong></h5>
+                    <h5 class="mb-0"><strong><?php echo formatRupiah($saldo_akhir); ?></strong></h5>
                 </div>
             </div>
         </div>

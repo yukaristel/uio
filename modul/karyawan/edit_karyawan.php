@@ -1,6 +1,6 @@
 <?php
 /**
- * FORM EDIT KARYAWAN
+ * FORM EDIT KARYAWAN (Fixed - Without is_active)
  * Halaman untuk edit data karyawan/user
  */
 
@@ -23,8 +23,11 @@ if (!$karyawan) {
 }
 
 // Get statistik karyawan
-$total_transaksi = fetchOne("SELECT COUNT(*) as total FROM transaksi_penjualan WHERE user_id = ?", [$id])['total'];
-$total_opname = fetchOne("SELECT COUNT(*) as total FROM stock_opname WHERE user_id = ?", [$id])['total'];
+$total_transaksi_result = fetchOne("SELECT COUNT(*) as total FROM transaksi_penjualan WHERE user_id = ?", [$id]);
+$total_transaksi = $total_transaksi_result ? intval($total_transaksi_result['total']) : 0;
+
+$total_opname_result = fetchOne("SELECT COUNT(*) as total FROM stock_opname WHERE user_id = ?", [$id]);
+$total_opname = $total_opname_result ? intval($total_opname_result['total']) : 0;
 ?>
 
 <div class="row mb-3">
@@ -163,24 +166,14 @@ $total_opname = fetchOne("SELECT COUNT(*) as total FROM stock_opname WHERE user_
                         </td>
                     </tr>
                     <tr>
-                        <td><strong>Status:</strong></td>
-                        <td>
-                            <?php if ($karyawan['is_active']): ?>
-                                <span class="badge bg-success">Aktif</span>
-                            <?php else: ?>
-                                <span class="badge bg-secondary">Non-aktif</span>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    <tr>
                         <td><strong>Terdaftar:</strong></td>
-                        <td><?php echo date('d/m/Y H:i', strtotime($karyawan['created_at'])); ?></td>
+                        <td><?php echo formatDateTime($karyawan['created_at'], 'd/m/Y H:i'); ?></td>
                     </tr>
                     <tr>
                         <td><strong>Login Terakhir:</strong></td>
                         <td>
-                            <?php if ($karyawan['last_login']): ?>
-                                <?php echo date('d/m/Y H:i', strtotime($karyawan['last_login'])); ?>
+                            <?php if (!empty($karyawan['last_login']) && $karyawan['last_login'] != '0000-00-00 00:00:00'): ?>
+                                <?php echo formatDateTime($karyawan['last_login'], 'd/m/Y H:i'); ?>
                             <?php else: ?>
                                 <em class="text-muted">Belum pernah login</em>
                             <?php endif; ?>

@@ -1,6 +1,6 @@
 <?php
 /**
- * LIST KARYAWAN
+ * LIST KARYAWAN (Fixed - Without is_active)
  * Halaman daftar semua karyawan/user
  */
 
@@ -8,9 +8,11 @@
 $karyawan_list = fetchAll("SELECT * FROM users ORDER BY created_at DESC");
 
 // Statistik
-$total_admin = fetchOne("SELECT COUNT(*) as total FROM users WHERE role = 'admin'")['total'];
-$total_karyawan = fetchOne("SELECT COUNT(*) as total FROM users WHERE role = 'karyawan'")['total'];
-$total_aktif = fetchOne("SELECT COUNT(*) as total FROM users WHERE is_active = 1")['total'];
+$total_admin = fetchOne("SELECT COUNT(*) as total FROM users WHERE role = 'admin'");
+$total_admin = $total_admin ? intval($total_admin['total']) : 0;
+
+$total_karyawan = fetchOne("SELECT COUNT(*) as total FROM users WHERE role = 'karyawan'");
+$total_karyawan = $total_karyawan ? intval($total_karyawan['total']) : 0;
 ?>
 
 <div class="row mb-3">
@@ -97,18 +99,17 @@ $total_aktif = fetchOne("SELECT COUNT(*) as total FROM users WHERE is_active = 1
                             <tr>
                                 <th width="5%">No</th>
                                 <th width="15%">Username</th>
-                                <th width="20%">Nama Lengkap</th>
-                                <th width="12%">Role</th>
-                                <th width="12%">Status</th>
-                                <th width="15%">Terdaftar</th>
-                                <th width="15%">Login Terakhir</th>
-                                <th width="6%">Aksi</th>
+                                <th width="25%">Nama Lengkap</th>
+                                <th width="15%">Role</th>
+                                <th width="18%">Terdaftar</th>
+                                <th width="17%">Login Terakhir</th>
+                                <th width="5%">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($karyawan_list)): ?>
                             <tr>
-                                <td colspan="8" class="text-center">Belum ada data karyawan</td>
+                                <td colspan="7" class="text-center">Belum ada data karyawan</td>
                             </tr>
                             <?php else: ?>
                                 <?php $no = 1; foreach ($karyawan_list as $k): ?>
@@ -130,22 +131,11 @@ $total_aktif = fetchOne("SELECT COUNT(*) as total FROM users WHERE is_active = 1
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <?php if ($k['is_active']): ?>
-                                            <span class="badge bg-success">
-                                                <i class="bi bi-check-circle"></i> Aktif
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="badge bg-secondary">
-                                                <i class="bi bi-x-circle"></i> Non-aktif
-                                            </span>
-                                        <?php endif; ?>
+                                        <small><?php echo formatDateTime($k['created_at'], 'd/m/Y H:i'); ?></small>
                                     </td>
                                     <td>
-                                        <small><?php echo date('d/m/Y H:i', strtotime($k['created_at'])); ?></small>
-                                    </td>
-                                    <td>
-                                        <?php if ($k['last_login']): ?>
-                                            <small><?php echo date('d/m/Y H:i', strtotime($k['last_login'])); ?></small>
+                                        <?php if (!empty($k['last_login']) && $k['last_login'] != '0000-00-00 00:00:00'): ?>
+                                            <small><?php echo formatDateTime($k['last_login'], 'd/m/Y H:i'); ?></small>
                                         <?php else: ?>
                                             <small class="text-muted">Belum login</small>
                                         <?php endif; ?>
@@ -184,7 +174,7 @@ $(document).ready(function() {
         "language": {
             "url": "//cdn.datatables.net/plug-ins/1.11.5/i18n/id.json"
         },
-        "order": [[5, "desc"]], // Sort by terdaftar
+        "order": [[4, "desc"]], // Sort by terdaftar
         "pageLength": 25
     });
 });

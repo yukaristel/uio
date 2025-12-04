@@ -162,27 +162,48 @@ function deleteBahan() {
     
     // Cek apakah bahan digunakan di resep
     $cek_resep = fetchOne("SELECT COUNT(*) as total FROM resep_menu WHERE bahan_id = ?", [$id]);
-    if ($cek_resep['total'] > 0) {
-        $_SESSION['error'] = 'Bahan ini digunakan di resep menu! Tidak dapat dihapus.';
+    if ($cek_resep && $cek_resep['total'] > 0) {
+        $_SESSION['error'] = 'Bahan ini digunakan di ' . $cek_resep['total'] . ' resep menu! Tidak dapat dihapus.';
         header('Location: ../index.php?page=list_bahan');
         exit;
     }
     
     // Cek apakah ada history pembelian
     $cek_pembelian = fetchOne("SELECT COUNT(*) as total FROM pembelian_bahan WHERE bahan_id = ?", [$id]);
-    if ($cek_pembelian['total'] > 0) {
-        $_SESSION['warning'] = 'Bahan ini memiliki history pembelian. Sebaiknya tidak dihapus.';
+    if ($cek_pembelian && $cek_pembelian['total'] > 0) {
+        $_SESSION['error'] = 'Bahan ini memiliki ' . $cek_pembelian['total'] . ' history pembelian! Tidak dapat dihapus.';
         header('Location: ../index.php?page=list_bahan');
         exit;
     }
     
-    $sql = "DELETE FROM bahan_baku WHERE id = ?";
-    $result = execute($sql, [$id]);
+    // Cek apakah ada stock movement
+    $cek_movement = fetchOne("SELECT COUNT(*) as total FROM stock_movement WHERE bahan_id = ?", [$id]);
+    if ($cek_movement && $cek_movement['total'] > 0) {
+        $_SESSION['error'] = 'Bahan ini memiliki ' . $cek_movement['total'] . ' history pergerakan stok! Tidak dapat dihapus.';
+        header('Location: ../index.php?page=list_bahan');
+        exit;
+    }
     
-    if ($result['success']) {
-        $_SESSION['success'] = 'Bahan baku berhasil dihapus!';
-    } else {
-        $_SESSION['error'] = 'Gagal menghapus bahan baku!';
+    // Cek apakah ada transaksi terkait
+    $cek_transaksi = fetchOne("SELECT COUNT(*) as total FROM detail_transaksi WHERE bahan_id = ?", [$id]);
+    if ($cek_transaksi && $cek_transaksi['total'] > 0) {
+        $_SESSION['error'] = 'Bahan ini memiliki history transaksi! Tidak dapat dihapus.';
+        header('Location: ../index.php?page=list_bahan');
+        exit;
+    }
+    
+    // Jika lolos semua pengecekan, hapus bahan
+    try {
+        $sql = "DELETE FROM bahan_baku WHERE id = ?";
+        $result = execute($sql, [$id]);
+        
+        if ($result['success']) {
+            $_SESSION['success'] = 'Bahan baku berhasil dihapus!';
+        } else {
+            $_SESSION['error'] = 'Gagal menghapus bahan baku!';
+        }
+    } catch (Exception $e) {
+        $_SESSION['error'] = 'Tidak dapat menghapus bahan: masih ada data terkait di sistem!';
     }
     
     header('Location: ../index.php?page=list_bahan');

@@ -138,20 +138,28 @@ function escape($string) {
     return $conn->real_escape_string($string);
 }
 
-// Helper function untuk format rupiah
+// Helper function untuk format rupiah (FIXED: Handle NULL)
 function formatRupiah($number) {
+    // Handle null, empty string, or non-numeric values
+    if ($number === null || $number === '' || !is_numeric($number)) {
+        $number = 0;
+    }
+    
+    // Convert to float to ensure numeric type
+    $number = floatval($number);
+    
     return 'Rp ' . number_format($number, 0, ',', '.');
 }
 
 // Helper function untuk format tanggal Indonesia
 function formatTanggal($date, $format = 'd/m/Y') {
-    if (empty($date)) return '-';
+    if (empty($date) || $date === null || $date === '0000-00-00') return '-';
     return date($format, strtotime($date));
 }
 
 // Helper function untuk format tanggal dan waktu
 function formatDateTime($datetime, $format = 'd/m/Y H:i') {
-    if (empty($datetime)) return '-';
+    if (empty($datetime) || $datetime === null || $datetime === '0000-00-00 00:00:00') return '-';
     return date($format, strtotime($datetime));
 }
 
