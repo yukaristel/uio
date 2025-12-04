@@ -222,11 +222,14 @@ chmod 777 uploads/menu  # Linux
 
 **Developer**: Roku and Yukari
 
+mitsuky.roku@gmail.com
+yusikaristel@gmail.com
+
 ---
 
 ## 📝 CATATAN
 
-- ⚠️ Aplikasi ini untuk 
+- ⚠️ Aplikasi ini untuk membantu manajemen rumah makan sederhana
 - ⚠️ Jangan gunakan di production tanpa security hardening
 - ⚠️ Backup database secara rutin
 
@@ -236,4 +239,4 @@ chmod 777 uploads/menu  # Linux
 
 Menggunakan: PHP, MySQL, Bootstrap 5, Chart.js
 
-**Progress: 47/64 file (73.4%) - ALMOST DONE!** 🚀  or maybe 100% now,,, i dont know,, im not open the files again lol
+**Progress: ALMOST DONE!** 🚀 maybe 99% now,,, i dont know,, im not open the files again lol
