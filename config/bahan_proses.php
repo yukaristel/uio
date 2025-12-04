@@ -79,7 +79,7 @@ function createBahan() {
     if ($result['success']) {
         // Jika stok_tersedia > 0, catat stock movement
         if ($stok_tersedia > 0) {
-            $bahan_id = $result['insert_id'];
+            $id = $result['insert_id'];
             
             $sql_movement = "INSERT INTO stock_movement 
                 (bahan_id, jenis_pergerakan, jumlah, satuan, harga_per_satuan, total_nilai, 
@@ -161,7 +161,7 @@ function deleteBahan() {
     }
     
     // Cek apakah bahan digunakan di resep
-    $cek_resep = fetchOne("SELECT COUNT(*) as total FROM resep_menu WHERE bahan_id = ?", [$id]);
+    $cek_resep = fetchOne("SELECT COUNT(*) as total FROM resep_menu WHERE id = ?", [$id]);
     if ($cek_resep && $cek_resep['total'] > 0) {
         $_SESSION['error'] = 'Bahan ini digunakan di ' . $cek_resep['total'] . ' resep menu! Tidak dapat dihapus.';
         header('Location: ../index.php?page=list_bahan');
@@ -169,7 +169,7 @@ function deleteBahan() {
     }
     
     // Cek apakah ada history pembelian
-    $cek_pembelian = fetchOne("SELECT COUNT(*) as total FROM pembelian_bahan WHERE bahan_id = ?", [$id]);
+    $cek_pembelian = fetchOne("SELECT COUNT(*) as total FROM pembelian_bahan WHERE id = ?", [$id]);
     if ($cek_pembelian && $cek_pembelian['total'] > 0) {
         $_SESSION['error'] = 'Bahan ini memiliki ' . $cek_pembelian['total'] . ' history pembelian! Tidak dapat dihapus.';
         header('Location: ../index.php?page=list_bahan');
@@ -177,7 +177,7 @@ function deleteBahan() {
     }
     
     // Cek apakah ada stock movement
-    $cek_movement = fetchOne("SELECT COUNT(*) as total FROM stock_movement WHERE bahan_id = ?", [$id]);
+    $cek_movement = fetchOne("SELECT COUNT(*) as total FROM stock_movement WHERE id = ?", [$id]);
     if ($cek_movement && $cek_movement['total'] > 0) {
         $_SESSION['error'] = 'Bahan ini memiliki ' . $cek_movement['total'] . ' history pergerakan stok! Tidak dapat dihapus.';
         header('Location: ../index.php?page=list_bahan');
@@ -185,7 +185,7 @@ function deleteBahan() {
     }
     
     // Cek apakah ada transaksi terkait
-    $cek_transaksi = fetchOne("SELECT COUNT(*) as total FROM detail_transaksi WHERE bahan_id = ?", [$id]);
+    $cek_transaksi = fetchOne("SELECT COUNT(*) as total FROM detail_transaksi WHERE id = ?", [$id]);
     if ($cek_transaksi && $cek_transaksi['total'] > 0) {
         $_SESSION['error'] = 'Bahan ini memiliki history transaksi! Tidak dapat dihapus.';
         header('Location: ../index.php?page=list_bahan');
