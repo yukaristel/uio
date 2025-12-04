@@ -102,6 +102,10 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
                         <li><a class="dropdown-item" href="index.php?page=rekonsiliasi_kas">
                             <i class="bi bi-check2-square"></i> Rekonsiliasi
                         </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-warning" href="index.php?page=generate_kas">
+                            <i class="bi bi-arrow-repeat"></i> Generate Kas
+                        </a></li>
                     </ul>
                 </li>
 

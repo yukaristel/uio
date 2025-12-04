@@ -16,7 +16,7 @@ $admin_pages = [
     'list_transaksi', 'buat_transaksi', 'detail_transaksi', 'struk_transaksi',
     'list_movement', 'tambah_movement', 'detail_movement', 'laporan_movement',
     'list_opname', 'tambah_opname', 'detail_opname', 'approval_opname', 'history_opname',
-    'dashboard_kas', 'list_transaksi_kas', 'tambah_transaksi_kas', 'detail_transaksi_kas', 'rekonsiliasi_kas', 'history_saldo',
+    'dashboard_kas', 'list_transaksi_kas', 'tambah_transaksi_kas', 'detail_transaksi_kas', 'rekonsiliasi_kas', 'history_saldo', 'generate_kas',
     'laporan_harian', 'laporan_bulanan', 'laporan_stok', 'laporan_menu', 'laporan_opname', 'laporan_kas',
     'profile'
 ];
@@ -105,6 +105,7 @@ $page_mapping = [
     'detail_transaksi_kas' => 'kas_umum/detail_transaksi_kas.php',
     'rekonsiliasi_kas' => 'kas_umum/rekonsiliasi_kas.php',
     'history_saldo' => 'kas_umum/history_saldo.php',
+    'generate_kas' => 'kas_umum/generate_kas.php',
     
     // Laporan
     'laporan_harian' => 'laporan/laporan_harian.php',
