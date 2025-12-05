@@ -80,9 +80,14 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="index.php?page=tambah_opname">
                             <i class="bi bi-plus-square"></i> Buat Opname Baru
-                        </a></li>
-                    </ul>
-                </li>
+                          </a></li>
+                          <li><hr class="dropdown-divider"></li>
+                          <!-- TAMBAHKAN INI -->
+                          <li><a class="dropdown-item text-warning" href="index.php?page=generate_stock">
+                              <i class="bi bi-arrow-repeat"></i> Generate Stock
+                          </a></li>
+                      </ul>
+                  </li>
 
                 <!-- Kas -->
                 <li class="nav-item dropdown">

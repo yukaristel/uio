@@ -15,7 +15,7 @@ $admin_pages = [
     'list_menu', 'tambah_menu', 'edit_menu', 'detail_menu', 'resep_menu', 'tambah_resep',
     'list_transaksi', 'buat_transaksi', 'detail_transaksi', 'struk_transaksi',
     'list_movement', 'tambah_movement', 'detail_movement', 'laporan_movement',
-    'list_opname', 'tambah_opname', 'detail_opname', 'approval_opname', 'history_opname',
+    'list_opname', 'tambah_opname', 'detail_opname', 'approval_opname', 'history_opname','generate_stock',
     'dashboard_kas', 'list_transaksi_kas', 'tambah_transaksi_kas', 'detail_transaksi_kas', 'rekonsiliasi_kas', 'history_saldo', 'generate_kas',
     'laporan_harian', 'laporan_bulanan', 'laporan_stok', 'laporan_menu', 'laporan_opname', 'laporan_kas',
     'profile'
@@ -90,6 +90,7 @@ $page_mapping = [
     'tambah_movement' => 'stock_movement/tambah_movement.php',
     'detail_movement' => 'stock_movement/detail_movement.php',
     'laporan_movement' => 'stock_movement/laporan_movement.php',
+    'generate_stock' => 'stock_movement/generate_stock.php',
     
     // Stock Opname
     'list_opname' => 'stock_opname/list_opname.php',

@@ -47,8 +47,9 @@ function createTransaksi() {
     $menu_items = isset($_POST['menu_id']) ? $_POST['menu_id'] : [];
     $jumlah_items = isset($_POST['jumlah']) ? $_POST['jumlah'] : [];
     $metode_pembayaran = $_POST['metode_pembayaran'];
-    $uang_bayar = isset($_POST['uang_bayar']) ? floatval($_POST['uang_bayar']) : 0;
     
+    $uang_bayar = isset($_POST['uang_bayar_value']) ? floatval($_POST['uang_bayar_value']) : 0;
+
     // Validasi minimal 1 item
     if (empty($menu_items)) {
         $_SESSION['error'] = 'Pilih minimal 1 menu!';
@@ -251,47 +252,80 @@ function cekStokBahan($menu_id, $jumlah_porsi) {
  * KURANGI STOK BAHAN + CATAT STOCK MOVEMENT
  */
 function kurangiStokBahan($transaksi_id, $menu_id, $jumlah_porsi) {
-    // Ambil resep menu
-    $resep = fetchAll("SELECT r.*, b.* 
+    // Ambil resep menu dengan JOIN ke bahan_baku
+    $resep = fetchAll("SELECT r.*, 
+                              b.id as bahan_id,
+                              b.kode_bahan,
+                              b.nama_bahan,
+                              b.satuan as satuan_bahan,
+                              b.stok_tersedia,
+                              b.harga_beli_per_satuan
                        FROM resep_menu r 
                        JOIN bahan_baku b ON r.bahan_id = b.id 
                        WHERE r.menu_id = ?", [$menu_id]);
+    
+    if (empty($resep)) {
+        throw new Exception("Menu belum memiliki resep!");
+    }
     
     foreach ($resep as $bahan) {
         // Konversi jumlah bahan ke satuan database
         $jumlah_konversi = konversiSatuan(
             $bahan['jumlah_bahan'],
-            $bahan['satuan'],
-            $bahan['satuan_bahan']
+            $bahan['satuan'], // satuan dari resep_menu
+            $bahan['satuan_bahan'] // satuan dari bahan_baku
         );
         
         // Total yang dipakai
         $jumlah_pakai = $jumlah_konversi * $jumlah_porsi;
         
-        // Stok sebelum
+        // Stok sebelum dan sesudah
         $stok_sebelum = $bahan['stok_tersedia'];
         $stok_sesudah = $stok_sebelum - $jumlah_pakai;
         
         // Update stok bahan
         $sql_update = "UPDATE bahan_baku SET stok_tersedia = ? WHERE id = ?";
-        execute($sql_update, [$stok_sesudah, $bahan['id']]);
+        $result_update = execute($sql_update, [$stok_sesudah, $bahan['bahan_id']]);
+        
+        if (!$result_update['success']) {
+            throw new Exception("Gagal update stok bahan: " . $bahan['nama_bahan']);
+        }
         
         // Catat stock movement
         $total_nilai = $jumlah_pakai * $bahan['harga_beli_per_satuan'];
+        
+        // PERBAIKAN: Pastikan satuan tidak NULL dan valid
+        // Gunakan satuan dari bahan_baku (yang pasti ada karena NOT NULL di database)
+        $satuan_movement = $bahan['satuan_bahan'];
+        
+        // Double check: jika masih kosong (seharusnya tidak mungkin)
+        if (empty($satuan_movement)) {
+            throw new Exception("Satuan bahan '{$bahan['nama_bahan']}' tidak valid!");
+        }
+        
+        $keterangan = "Penjualan - Menu ID: $menu_id (x$jumlah_porsi porsi)";
         
         $sql_movement = "INSERT INTO stock_movement 
             (bahan_id, jenis_pergerakan, jumlah, satuan, harga_per_satuan, total_nilai, 
             stok_sebelum, stok_sesudah, referensi_type, referensi_id, keterangan, user_id) 
             VALUES (?, 'keluar', ?, ?, ?, ?, ?, ?, 'penjualan', ?, ?, ?)";
         
-        $keterangan = "Penjualan - Menu ID: $menu_id (x$jumlah_porsi porsi)";
-        
-        execute($sql_movement, [
-            $bahan['id'], $jumlah_pakai, $bahan['satuan_bahan'], 
-            $bahan['harga_beli_per_satuan'], $total_nilai,
-            $stok_sebelum, $stok_sesudah, $transaksi_id, 
-            $keterangan, $_SESSION['user_id']
+        $result_movement = execute($sql_movement, [
+            $bahan['bahan_id'], 
+            $jumlah_pakai, 
+            $satuan_movement, // Menggunakan satuan dari bahan_baku
+            $bahan['harga_beli_per_satuan'], 
+            $total_nilai,
+            $stok_sebelum, 
+            $stok_sesudah, 
+            $transaksi_id, 
+            $keterangan, 
+            $_SESSION['user_id']
         ]);
+        
+        if (!$result_movement['success']) {
+            throw new Exception("Gagal catat stock movement: " . $bahan['nama_bahan']);
+        }
     }
 }
 

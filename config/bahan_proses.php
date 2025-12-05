@@ -1,7 +1,12 @@
 <?php
 /**
- * PROSES CRUD BAHAN BAKU (Harga Total)
+ * PROSES CRUD BAHAN BAKU (Harga Total) - FIXED
  * Step 16/64 (25.0%)
+ * 
+ * PERUBAHAN:
+ * - Fix bug variabel $bahan_id di createBahan()
+ * - Fix query WHERE clause di deleteBahan() (ganti 'id' ke 'bahan_id')
+ * - Tambahkan pengecekan stock_opname di deleteBahan()
  */
 
 session_start();
@@ -45,7 +50,7 @@ function createBahan() {
     $satuan = $_POST['satuan'];
     $stok_tersedia = floatval($_POST['stok_tersedia']);
     $stok_minimum = floatval($_POST['stok_minimum']);
-    $total_harga_awal = floatval($_POST['total_harga_awal']); // UBAH: input total harga
+    $total_harga_awal = floatval($_POST['total_harga_awal']);
     
     // Validasi
     if (empty($kode_bahan) || empty($nama_bahan) || empty($satuan)) {
@@ -77,18 +82,24 @@ function createBahan() {
     $result = execute($sql, [$kode_bahan, $nama_bahan, $satuan, $stok_tersedia, $stok_minimum, $harga_beli_per_satuan]);
     
     if ($result['success']) {
+        // FIX: Gunakan variabel yang benar dari insert_id
+        $bahan_id = $result['insert_id'];
+        
         // Jika stok_tersedia > 0, catat stock movement
         if ($stok_tersedia > 0) {
-            $id = $result['insert_id'];
-            
             $sql_movement = "INSERT INTO stock_movement 
                 (bahan_id, jenis_pergerakan, jumlah, satuan, harga_per_satuan, total_nilai, 
                 stok_sebelum, stok_sesudah, referensi_type, keterangan, user_id) 
                 VALUES (?, 'masuk', ?, ?, ?, ?, 0, ?, 'manual', 'Stok awal bahan baku', ?)";
             
             execute($sql_movement, [
-                $bahan_id, $stok_tersedia, $satuan, $harga_beli_per_satuan, 
-                $total_harga_awal, $stok_tersedia, $_SESSION['user_id']
+                $bahan_id, // FIX: gunakan $bahan_id bukan $id
+                $stok_tersedia, 
+                $satuan, 
+                $harga_beli_per_satuan, 
+                $total_harga_awal, 
+                $stok_tersedia, 
+                $_SESSION['user_id']
             ]);
         }
         
@@ -115,7 +126,6 @@ function updateBahan() {
     $nama_bahan = trim($_POST['nama_bahan']);
     $satuan = $_POST['satuan'];
     $stok_minimum = floatval($_POST['stok_minimum']);
-    // Harga tidak diupdate di form edit, hanya via pembelian
     
     // Validasi
     if (empty($kode_bahan) || empty($nama_bahan) || empty($satuan)) {
@@ -160,34 +170,34 @@ function deleteBahan() {
         exit;
     }
     
-    // Cek apakah bahan digunakan di resep
-    $cek_resep = fetchOne("SELECT COUNT(*) as total FROM resep_menu WHERE id = ?", [$id]);
+    // FIX: Cek apakah bahan digunakan di resep (ganti WHERE id ke bahan_id)
+    $cek_resep = fetchOne("SELECT COUNT(*) as total FROM resep_menu WHERE bahan_id = ?", [$id]);
     if ($cek_resep && $cek_resep['total'] > 0) {
         $_SESSION['error'] = 'Bahan ini digunakan di ' . $cek_resep['total'] . ' resep menu! Tidak dapat dihapus.';
         header('Location: ../index.php?page=list_bahan');
         exit;
     }
     
-    // Cek apakah ada history pembelian
-    $cek_pembelian = fetchOne("SELECT COUNT(*) as total FROM pembelian_bahan WHERE id = ?", [$id]);
+    // FIX: Cek apakah ada history pembelian (ganti WHERE id ke bahan_id)
+    $cek_pembelian = fetchOne("SELECT COUNT(*) as total FROM pembelian_bahan WHERE bahan_id = ?", [$id]);
     if ($cek_pembelian && $cek_pembelian['total'] > 0) {
         $_SESSION['error'] = 'Bahan ini memiliki ' . $cek_pembelian['total'] . ' history pembelian! Tidak dapat dihapus.';
         header('Location: ../index.php?page=list_bahan');
         exit;
     }
     
-    // Cek apakah ada stock movement
-    $cek_movement = fetchOne("SELECT COUNT(*) as total FROM stock_movement WHERE id = ?", [$id]);
+    // FIX: Cek apakah ada stock movement (ganti WHERE id ke bahan_id)
+    $cek_movement = fetchOne("SELECT COUNT(*) as total FROM stock_movement WHERE bahan_id = ?", [$id]);
     if ($cek_movement && $cek_movement['total'] > 0) {
         $_SESSION['error'] = 'Bahan ini memiliki ' . $cek_movement['total'] . ' history pergerakan stok! Tidak dapat dihapus.';
         header('Location: ../index.php?page=list_bahan');
         exit;
     }
     
-    // Cek apakah ada transaksi terkait
-    $cek_transaksi = fetchOne("SELECT COUNT(*) as total FROM detail_transaksi WHERE id = ?", [$id]);
-    if ($cek_transaksi && $cek_transaksi['total'] > 0) {
-        $_SESSION['error'] = 'Bahan ini memiliki history transaksi! Tidak dapat dihapus.';
+    // FIX: Tambahkan pengecekan stock opname
+    $cek_opname = fetchOne("SELECT COUNT(*) as total FROM stock_opname WHERE bahan_id = ?", [$id]);
+    if ($cek_opname && $cek_opname['total'] > 0) {
+        $_SESSION['error'] = 'Bahan ini memiliki ' . $cek_opname['total'] . ' history stock opname! Tidak dapat dihapus.';
         header('Location: ../index.php?page=list_bahan');
         exit;
     }

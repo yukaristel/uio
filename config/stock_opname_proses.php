@@ -1,7 +1,12 @@
 <?php
 /**
- * PROSES STOCK OPNAME + APPROVAL
+ * PROSES STOCK OPNAME + APPROVAL (Updated for Weighted Average)
  * Step 23/64 (35.9%)
+ * 
+ * PERUBAHAN:
+ * - createOpname() menggunakan harga weighted average terkini
+ * - approveOpname() recalculate nilai_selisih dengan harga terkini saat approval
+ * - Movement menggunakan harga weighted average saat approval
  */
 
 session_start();
@@ -33,6 +38,7 @@ switch ($action) {
 
 /**
  * CREATE - Buat Stock Opname (Draft)
+ * UPDATED: Menggunakan weighted average terkini
  */
 function createOpname() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -61,10 +67,13 @@ function createOpname() {
         exit;
     }
     
-    // Hitung selisih
+    // Hitung selisih dengan weighted average terkini
     $stok_sistem = $bahan['stok_tersedia'];
     $selisih = $stok_fisik - $stok_sistem;
-    $nilai_selisih = $selisih * $bahan['harga_beli_per_satuan'];
+    
+    // UPDATED: Gunakan harga weighted average terkini
+    $harga_per_satuan = $bahan['harga_beli_per_satuan'];
+    $nilai_selisih = abs($selisih) * $harga_per_satuan;
     
     // Generate nomor opname
     $no_opname = generateNoOpname();
@@ -77,7 +86,7 @@ function createOpname() {
     
     $result = execute($sql, [
         $no_opname, $tanggal_opname, $bahan_id, $stok_sistem, $stok_fisik, $selisih,
-        $bahan['satuan'], $bahan['harga_beli_per_satuan'], $nilai_selisih,
+        $bahan['satuan'], $harga_per_satuan, $nilai_selisih,
         $jenis_selisih, $keterangan, $_SESSION['user_id']
     ]);
     
@@ -100,6 +109,7 @@ function createOpname() {
 
 /**
  * APPROVE - Approve Stock Opname (Admin Only)
+ * UPDATED: Recalculate dengan weighted average terkini saat approval
  */
 function approveOpname() {
     // Cek akses admin
@@ -117,8 +127,11 @@ function approveOpname() {
         exit;
     }
     
-    // Ambil data opname
-    $opname = fetchOne("SELECT so.*, b.nama_bahan 
+    // Ambil data opname dengan JOIN ke bahan_baku untuk mendapat harga terkini
+    $opname = fetchOne("SELECT so.*, 
+                               b.nama_bahan, 
+                               b.satuan, 
+                               b.harga_beli_per_satuan
                         FROM stock_opname so 
                         JOIN bahan_baku b ON so.bahan_id = b.id 
                         WHERE so.id = ?", [$id]);
@@ -140,17 +153,31 @@ function approveOpname() {
     try {
         $conn->begin_transaction();
         
-        // 1. Update status opname
+        // CRITICAL: Gunakan harga weighted average TERKINI saat approval
+        $harga_terkini = $opname['harga_beli_per_satuan'];
+        $nilai_selisih_baru = abs($opname['selisih']) * $harga_terkini;
+        
+        // 1. Update status opname dengan harga dan nilai terkini
         $sql_update_opname = "UPDATE stock_opname 
-                              SET status = 'approved', approved_by = ?, approved_at = NOW() 
+                              SET status = 'approved', 
+                                  harga_per_satuan = ?,
+                                  nilai_selisih = ?,
+                                  approved_by = ?, 
+                                  approved_at = NOW() 
                               WHERE id = ?";
-        $result = execute($sql_update_opname, [$_SESSION['user_id'], $id]);
+        $result = execute($sql_update_opname, [
+            $harga_terkini, 
+            $nilai_selisih_baru,
+            $_SESSION['user_id'], 
+            $id
+        ]);
         
         if (!$result['success']) {
             throw new Exception('Gagal update status opname!');
         }
         
         // 2. Update stok bahan ke stok fisik
+        // Note: Harga weighted average TIDAK berubah, hanya stok yang berubah
         $sql_update_bahan = "UPDATE bahan_baku SET stok_tersedia = ? WHERE id = ?";
         $result_bahan = execute($sql_update_bahan, [$opname['stok_fisik'], $opname['bahan_id']]);
         
@@ -158,7 +185,7 @@ function approveOpname() {
             throw new Exception('Gagal update stok bahan!');
         }
         
-        // 3. Catat stock movement
+        // 3. Catat stock movement dengan harga weighted average terkini
         $jenis_movement = ($opname['selisih'] < 0) ? $opname['jenis_selisih'] : 'opname';
         $jumlah_movement = abs($opname['selisih']);
         
@@ -171,10 +198,17 @@ function approveOpname() {
                                ($opname['selisih'] < 0 ? '(Kurang)' : '(Lebih)');
         
         $result_movement = execute($sql_movement, [
-            $opname['bahan_id'], $jenis_movement, $jumlah_movement, $opname['satuan'],
-            $opname['harga_per_satuan'], abs($opname['nilai_selisih']),
-            $opname['stok_sistem'], $opname['stok_fisik'],
-            $id, $keterangan_movement, $_SESSION['user_id']
+            $opname['bahan_id'], 
+            $jenis_movement, 
+            $jumlah_movement, 
+            $opname['satuan'],
+            $harga_terkini, // UPDATED: Gunakan harga terkini
+            $nilai_selisih_baru, // UPDATED: Gunakan nilai terkini
+            $opname['stok_sistem'], 
+            $opname['stok_fisik'],
+            $id, 
+            $keterangan_movement, 
+            $_SESSION['user_id']
         ]);
         
         if (!$result_movement['success']) {
@@ -184,9 +218,10 @@ function approveOpname() {
         // COMMIT
         $conn->commit();
         
+        // Pesan sukses dengan info terbaru
         if ($opname['selisih'] < 0) {
             $_SESSION['warning'] = 'Stock opname berhasil di-approve! Kerugian: ' . 
-                                   formatRupiah(abs($opname['nilai_selisih'])) . 
+                                   formatRupiah($nilai_selisih_baru) . 
                                    ' (' . number_format(abs($opname['selisih']), 2) . ' ' . $opname['satuan'] . ')';
         } else {
             $_SESSION['success'] = 'Stock opname berhasil di-approve! Stok ' . $opname['nama_bahan'] . 
@@ -242,5 +277,24 @@ function deleteOpname() {
     
     header('Location: ../index.php?page=list_opname');
     exit;
+}
+
+/**
+ * Helper: Generate Nomor Opname
+ */
+function generateNoOpname() {
+    $today = date('Ymd');
+    $last = fetchOne("SELECT no_opname FROM stock_opname 
+                      WHERE no_opname LIKE 'OPN-$today-%' 
+                      ORDER BY no_opname DESC LIMIT 1");
+    
+    if ($last) {
+        $last_no = intval(substr($last['no_opname'], -3));
+        $new_no = $last_no + 1;
+    } else {
+        $new_no = 1;
+    }
+    
+    return 'OPN-' . $today . '-' . str_pad($new_no, 3, '0', STR_PAD_LEFT);
 }
 ?>
