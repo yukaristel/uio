@@ -126,7 +126,6 @@ foreach ($menu_list as $menu) {
                             </div>
                         </div>
                     </div>
-
                 </div>
 
                 <!-- RIGHT SIDE: Cart & Payment -->
@@ -156,6 +155,12 @@ foreach ($menu_list as $menu) {
                                             <strong id="totalQty2">0</strong>
                                         </div>
                                         <hr class="my-2">
+                                    </div>
+                                </div>
+                                
+                                <!-- RIGHT: Payment Form -->
+                                <div class="col-6">
+                                    <div class="summary-payment">
                                         <div class="summary-mini">
                                             <strong>TOTAL:</strong>
                                             <h5 class="text-primary mb-0" id="totalHarga2">Rp 0</h5>
@@ -164,10 +169,13 @@ foreach ($menu_list as $menu) {
                                             <strong class="text-success">Kembalian:</strong>
                                             <h6 class="text-success mb-0" id="uangKembaliMini">Rp 0</h6>
                                         </div>
+                                        <hr class="my-2">
                                     </div>
                                 </div>
-                                
-                                <!-- RIGHT: Payment Form -->
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <!-- LEFT: Summary -->
                                 <div class="col-6">
                                     <div class="mb-3">
                                         <label class="form-label">Metode Pembayaran</label>
@@ -178,7 +186,10 @@ foreach ($menu_list as $menu) {
                                             <option value="gojek">🟢 GoJek</option>
                                         </select>
                                     </div>
-                                    
+                                </div>
+                                
+                                <!-- RIGHT: Payment Form -->
+                                <div class="col-6">
                                     <div id="formUangBayarInput">
                                         <div class="mb-3">
                                             <label class="form-label">Uang Bayar</label>
