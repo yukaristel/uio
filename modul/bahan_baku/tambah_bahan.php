@@ -1,8 +1,20 @@
 ﻿<?php
 /**
- * FORM TAMBAH BAHAN BAKU (Harga Total)
+ * FORM TAMBAH BAHAN BAKU (Auto Generate Kode)
  * Step 35/64 (54.7%)
  */
+
+// Generate kode bahan otomatis
+$last_bahan = fetchOne("SELECT kode_bahan FROM bahan_baku ORDER BY id DESC LIMIT 1");
+if ($last_bahan) {
+    // Ambil angka dari kode terakhir (BHN001 -> 001)
+    preg_match('/\d+/', $last_bahan['kode_bahan'], $matches);
+    $last_number = isset($matches[0]) ? intval($matches[0]) : 0;
+    $new_number = $last_number + 1;
+} else {
+    $new_number = 1;
+}
+$kode_bahan_auto = 'BHN' . str_pad($new_number, 3, '0', STR_PAD_LEFT);
 ?>
 
 <div class="row mb-3">
@@ -29,10 +41,12 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label">Kode Bahan *</label>
-                                <input type="text" class="form-control" name="kode_bahan" 
-                                       placeholder="Contoh: BHN001" required maxlength="20"
-                                       style="text-transform: uppercase;">
-                                <small class="text-muted">Kode unik untuk identifikasi bahan</small>
+                                <input type="text" class="form-control bg-light" name="kode_bahan" 
+                                       value="<?php echo $kode_bahan_auto; ?>" readonly
+                                       style="text-transform: uppercase; font-weight: bold;">
+                                <small class="text-muted">
+                                    <i class="bi bi-info-circle"></i> Kode dibuat otomatis
+                                </small>
                             </div>
                         </div>
 
@@ -40,7 +54,8 @@
                             <div class="mb-3">
                                 <label class="form-label">Nama Bahan *</label>
                                 <input type="text" class="form-control" name="nama_bahan" 
-                                       placeholder="Contoh: Beras Premium" required maxlength="100">
+                                       placeholder="Contoh: Beras Premium" required maxlength="100"
+                                       autofocus>
                             </div>
                         </div>
 
@@ -92,7 +107,7 @@
                                 <i class="bi bi-info-circle"></i>
                                 <strong>Catatan:</strong>
                                 <ul class="mb-0">
-                                    <li>Kode bahan harus unik (tidak boleh sama)</li>
+                                    <li><strong>Kode bahan dibuat otomatis</strong> (<?php echo $kode_bahan_auto; ?>)</li>
                                     <li>Input <strong>TOTAL HARGA</strong> untuk stok awal</li>
                                     <li>Harga per satuan akan dihitung otomatis</li>
                                     <li>Stok awal bisa 0 jika belum ada stok</li>
@@ -117,7 +132,23 @@
     </div>
 
     <div class="col-md-4">
-        <div class="card">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-magic"></i> Kode Otomatis
+            </div>
+            <div class="card-body">
+                <h4 class="text-primary"><?php echo $kode_bahan_auto; ?></h4>
+                <p class="text-muted mb-0">
+                    <small>
+                        <i class="bi bi-check-circle"></i> Kode ini akan disimpan otomatis<br>
+                        <i class="bi bi-shield-check"></i> Tidak perlu input manual<br>
+                        <i class="bi bi-arrow-repeat"></i> Auto increment dari data terakhir
+                    </small>
+                </p>
+            </div>
+        </div>
+
+        <div class="card mt-3">
             <div class="card-header bg-info text-white">
                 <i class="bi bi-lightbulb"></i> Panduan
             </div>
@@ -136,7 +167,7 @@
 
                 <h6>Tips:</h6>
                 <ul class="small mb-0">
-                    <li>Gunakan kode yang mudah diingat</li>
+                    <li>Kode dibuat otomatis, fokus ke data bahan</li>
                     <li>Set stok minimum 20% dari stok normal</li>
                     <li>Input total harga beli, bukan per satuan</li>
                     <li>Harga akan auto-update saat pembelian</li>
