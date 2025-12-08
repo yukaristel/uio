@@ -1,7 +1,8 @@
 ﻿<?php
 /**
- * FORM BUAT TRANSAKSI PENJUALAN - MODERN TOUCH UI
+ * FORM BUAT TRANSAKSI PENJUALAN - MODERN TOUCH UI + GRATIS SPLIT
  * Step 25/64 (39.1%)
+ * FITUR: Gratis dengan split item
  * Optimized for touchscreen
  */
 
@@ -124,6 +125,16 @@ foreach ($menu_list as $menu) {
                                 <h5>TOTAL:</h5>
                                 <h4 class="text-primary mb-0" id="totalHarga">Rp 0</h4>
                             </div>
+                            <div id="potonganInfo" style="display: none;">
+                                <div class="summary-row text-muted mt-2">
+                                    <small>Harga Awal:</small>
+                                    <small><s id="hargaAwal">Rp 0</s></small>
+                                </div>
+                                <div class="summary-row text-danger">
+                                    <small>Potongan:</small>
+                                    <small id="nominalPotongan">Rp 0</small>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -164,6 +175,16 @@ foreach ($menu_list as $menu) {
                                         <div class="summary-mini">
                                             <strong>TOTAL:</strong>
                                             <h5 class="text-primary mb-0" id="totalHarga2">Rp 0</h5>
+                                        </div>
+                                        <div id="potonganInfo2" style="display: none;">
+                                            <div class="summary-mini mt-1">
+                                                <small class="text-muted">Harga Awal:</small>
+                                                <small class="text-muted"><s id="hargaAwal2">Rp 0</s></small>
+                                            </div>
+                                            <div class="summary-mini">
+                                                <small class="text-danger">Potongan:</small>
+                                                <small class="text-danger" id="nominalPotongan2">Rp 0</small>
+                                            </div>
                                         </div>
                                         <div class="summary-mini mt-2" id="displayKembaliMini">
                                             <strong class="text-success">Kembalian:</strong>
@@ -275,7 +296,7 @@ foreach ($menu_list as $menu) {
     /* Menu Cards */
     .menu-container {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        grid-template-columns: repeat(4, 1fr);
         gap: 1rem;
         max-height: calc(100vh - 300px);
         overflow-y: auto;
@@ -305,13 +326,13 @@ foreach ($menu_list as $menu) {
 
     .menu-image {
         width: 100%;
-        height: 150px;
+        height: 100px;
         object-fit: cover;
     }
 
     .menu-image-placeholder {
         width: 100%;
-        height: 150px;
+        height: 100px;
         background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
         display: flex;
         align-items: center;
@@ -379,31 +400,89 @@ foreach ($menu_list as $menu) {
     }
 
     .cart-item {
-        display: flex;
-        align-items: center;
         padding: 1rem;
         border-bottom: 1px solid #eee;
         transition: background 0.2s;
+    }
+
+    .cart-item.gratis {
+        background: #f0fff4;
+        border-left: 4px solid #28a745;
     }
 
     .cart-item:hover {
         background: #f8f9fa;
     }
 
-    .cart-item-info {
-        flex: 1;
-        padding-right: 1rem;
+    .cart-item.gratis:hover {
+        background: #e6f9ec;
+    }
+
+    .cart-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 0.5rem;
     }
 
     .cart-item-name {
         font-weight: 600;
         margin-bottom: 0.25rem;
         color: #333;
+        flex: 1;
     }
 
-    .cart-item-price {
+    .cart-item.gratis .cart-item-name {
+        color: #28a745;
+    }
+
+    .badge-gratis {
+        background: #28a745;
+        color: white;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        display: inline-block;
+        margin-bottom: 0.25rem;
+    }
+
+    .cart-item-price-info {
+        font-size: 0.85rem;
         color: #666;
-        font-size: 0.9rem;
+    }
+
+    .cart-item.gratis .cart-item-price-info {
+        text-decoration: line-through;
+        color: #999;
+    }
+
+    .cart-item-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 0.5rem;
+    }
+
+    .btn-action-gratis {
+        width: 36px;
+        height: 36px;
+        border-radius: 6px;
+        border: 2px solid #28a745;
+        background: white;
+        color: #28a745;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 1rem;
+    }
+
+    .btn-action-gratis:hover,
+    .btn-action-gratis.active {
+        background: #28a745;
+        color: white;
     }
 
     .cart-item-controls {
@@ -413,13 +492,13 @@ foreach ($menu_list as $menu) {
     }
 
     .qty-btn {
-        width: 36px;
-        height: 36px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
         border: 2px solid var(--primary-color);
         background: white;
         color: var(--primary-color);
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -437,15 +516,15 @@ foreach ($menu_list as $menu) {
     }
 
     .qty-display {
-        min-width: 40px;
+        min-width: 35px;
         text-align: center;
         font-weight: 700;
-        font-size: 1.1rem;
+        font-size: 1rem;
     }
 
     .btn-remove {
-        width: 36px;
-        height: 36px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
         border: 2px solid var(--danger-color);
         background: white;
@@ -636,13 +715,13 @@ foreach ($menu_list as $menu) {
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let cart = {};
+    let cartIdCounter = 0;
     let uangBayarValue = "";
     let currentView = 'grid';
 
     const metodePembayaran = document.getElementById('metodePembayaran');
     const formUangBayar = document.getElementById('formUangBayar');
     const uangBayarInput = document.getElementById('uangBayar');
-    const displayKembali = document.getElementById('displayKembali');
     const btnProses = document.getElementById('btnProses');
     const cartItemsContainer = document.getElementById('cartItems');
     const menuContainer = document.getElementById('menuContainer');
@@ -670,14 +749,26 @@ document.addEventListener('DOMContentLoaded', function() {
             const menuNama = this.dataset.nama;
             const menuHarga = parseFloat(this.dataset.harga);
 
-            if (cart[menuId]) {
-                cart[menuId].qty++;
-            } else {
-                cart[menuId] = {
-                    id: menuId,
+            // Cek apakah sudah ada item normal (not gratis) dengan menu_id ini
+            let foundNormal = false;
+            for (let cartId in cart) {
+                if (cart[cartId].menu_id === menuId && !cart[cartId].is_gratis) {
+                    cart[cartId].qty++;
+                    foundNormal = true;
+                    break;
+                }
+            }
+
+            // Jika tidak ada, buat baru
+            if (!foundNormal) {
+                const newCartId = 'cart_' + (++cartIdCounter);
+                cart[newCartId] = {
+                    cart_id: newCartId,
+                    menu_id: menuId,
                     nama: menuNama,
                     harga: menuHarga,
-                    qty: 1
+                    qty: 1,
+                    is_gratis: false
                 };
             }
 
@@ -743,22 +834,42 @@ document.addEventListener('DOMContentLoaded', function() {
             let totalItem = 0;
             let totalQty = 0;
             let totalHarga = 0;
+            let totalHargaAwal = 0;
 
-            for (let menuId in cart) {
-                const item = cart[menuId];
-                const subtotal = item.harga * item.qty;
+            for (let cartId in cart) {
+                const item = cart[cartId];
+                const subtotal = item.is_gratis ? 0 : (item.harga * item.qty);
+                const subtotalAwal = item.harga * item.qty;
+
+                // Badge gratis
+                let badgeHtml = '';
+                if (item.is_gratis) {
+                    badgeHtml = '<span class="badge-gratis">🎁 GRATIS</span>';
+                }
+
+                // Price display
+                let priceDisplay = `${formatRupiah(item.harga)} × ${item.qty} = ${formatRupiah(subtotalAwal)}`;
 
                 html += `
-                    <div class="cart-item">
-                        <div class="cart-item-info">
-                            <div class="cart-item-name">${item.nama}</div>
-                            <div class="cart-item-price">${formatRupiah(item.harga)} × ${item.qty} = ${formatRupiah(subtotal)}</div>
+                    <div class="cart-item ${item.is_gratis ? 'gratis' : ''}">
+                        <div class="cart-item-header">
+                            <div style="flex: 1;">
+                                <div class="cart-item-name">${item.nama}</div>
+                                ${badgeHtml}
+                            </div>
                         </div>
-                        <div class="cart-item-controls">
-                            <button type="button" class="qty-btn" onclick="decreaseQty('${menuId}')">−</button>
-                            <span class="qty-display">${item.qty}</span>
-                            <button type="button" class="qty-btn" onclick="increaseQty('${menuId}')">+</button>
-                            <button type="button" class="btn-remove" onclick="removeItem('${menuId}')">×</button>
+                        <div class="cart-item-price-info">${priceDisplay}</div>
+                        <div class="cart-item-footer">
+                            <button type="button" class="btn-action-gratis ${item.is_gratis ? 'active' : ''}" 
+                                    onclick="toggleGratis('${cartId}')" title="${item.is_gratis ? 'Klik untuk kembali normal' : 'Klik untuk gratis'}">
+                                <i class="bi bi-gift"></i>
+                            </button>
+                            <div class="cart-item-controls">
+                                <button type="button" class="qty-btn" onclick="decreaseQty('${cartId}')">−</button>
+                                <span class="qty-display">${item.qty}</span>
+                                <button type="button" class="qty-btn" onclick="increaseQty('${cartId}')">+</button>
+                                <button type="button" class="btn-remove" onclick="removeItem('${cartId}')">×</button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -766,43 +877,107 @@ document.addEventListener('DOMContentLoaded', function() {
                 totalItem++;
                 totalQty += item.qty;
                 totalHarga += subtotal;
+                totalHargaAwal += subtotalAwal;
             }
 
             cartItemsContainer.innerHTML = html;
 
+            // Update summary
             document.getElementById('totalItem').textContent = totalItem;
             document.getElementById('totalQty').textContent = totalQty;
             document.getElementById('totalHarga').textContent = formatRupiah(totalHarga);
             
-            // Update summary mini di payment section
             document.getElementById('totalItem2').textContent = totalItem;
             document.getElementById('totalQty2').textContent = totalQty;
             document.getElementById('totalHarga2').textContent = formatRupiah(totalHarga);
+
+            // Show/hide potongan info
+            const potongan = totalHargaAwal - totalHarga;
+            if (potongan > 0) {
+                document.getElementById('potonganInfo').style.display = 'block';
+                document.getElementById('hargaAwal').textContent = formatRupiah(totalHargaAwal);
+                document.getElementById('nominalPotongan').textContent = formatRupiah(potongan);
+                
+                document.getElementById('potonganInfo2').style.display = 'block';
+                document.getElementById('hargaAwal2').textContent = formatRupiah(totalHargaAwal);
+                document.getElementById('nominalPotongan2').textContent = formatRupiah(potongan);
+            } else {
+                document.getElementById('potonganInfo').style.display = 'none';
+                document.getElementById('potonganInfo2').style.display = 'none';
+            }
 
             if (uangBayarValue) updateUangBayar();
         }
     }
 
-    window.increaseQty = function(menuId) {
-        if (cart[menuId] && cart[menuId].qty < 99) {
-            cart[menuId].qty++;
+    window.increaseQty = function(cartId) {
+        if (cart[cartId] && cart[cartId].qty < 99) {
+            cart[cartId].qty++;
             updateCart();
         }
     };
 
-    window.decreaseQty = function(menuId) {
-        if (cart[menuId]) {
-            if (cart[menuId].qty > 1) {
-                cart[menuId].qty--;
+    window.decreaseQty = function(cartId) {
+        if (cart[cartId]) {
+            if (cart[cartId].qty > 1) {
+                cart[cartId].qty--;
                 updateCart();
             } else {
-                removeItem(menuId);
+                removeItem(cartId);
             }
         }
     };
 
-    window.removeItem = function(menuId) {
-        delete cart[menuId];
+    window.removeItem = function(cartId) {
+        delete cart[cartId];
+        updateCart();
+    };
+
+    // =================================
+    // TOGGLE GRATIS (SPLIT LOGIC)
+    // =================================
+    window.toggleGratis = function(cartId) {
+        const item = cart[cartId];
+        
+        if (item.is_gratis) {
+            // Jika item gratis diklik → gabung ke item normal
+            // Cari item normal dengan menu_id yang sama
+            let foundNormal = false;
+            for (let cId in cart) {
+                if (cId !== cartId && cart[cId].menu_id === item.menu_id && !cart[cId].is_gratis) {
+                    cart[cId].qty += item.qty;
+                    delete cart[cartId];
+                    foundNormal = true;
+                    break;
+                }
+            }
+            
+            // Jika tidak ada item normal, ubah item ini jadi normal
+            if (!foundNormal) {
+                item.is_gratis = false;
+            }
+        } else {
+            // Jika item normal diklik → split 1 qty jadi gratis
+            if (item.qty > 1) {
+                // Kurangi qty item ini
+                item.qty--;
+                
+                // Buat item gratis baru dengan qty 1
+                const newCartId = 'cart_' + (++cartIdCounter);
+                cart[newCartId] = {
+                    cart_id: newCartId,
+                    menu_id: item.menu_id,
+                    nama: item.nama,
+                    harga: item.harga,
+                    qty: 1,
+                    is_gratis: true
+                };
+            } else {
+                // Jika qty = 1, langsung ubah jadi gratis
+                item.is_gratis = true;
+            }
+        }
+        
         updateCart();
     };
 
@@ -818,7 +993,6 @@ document.addEventListener('DOMContentLoaded', function() {
             formUangBayar.style.display = 'none';
             document.getElementById('formUangBayarInput').style.display = 'none';
             uangBayarInput.required = false;
-            displayKembali.style.display = 'none';
         }
     });
 
@@ -860,15 +1034,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const totalHarga = getTotalHarga();
         const kembali = numberValue - totalHarga;
         
-        // Update kembalian mini (always visible)
         document.getElementById('uangKembaliMini').textContent = formatRupiah(kembali);
 
         if (kembali >= 0 && numberValue > 0) {
-            displayKembali.style.display = 'block';
-            document.getElementById('uangKembali').textContent = formatRupiah(kembali);
             btnProses.disabled = false;
         } else {
-            displayKembali.style.display = 'none';
             btnProses.disabled = numberValue === 0 && metodePembayaran.value === 'tunai';
         }
     }
@@ -877,8 +1047,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // FORM SUBMIT
     // =================================
     document.getElementById('formTransaksi').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
         if (Object.keys(cart).length === 0) {
-            e.preventDefault();
             alert('Pilih minimal 1 menu!');
             return false;
         }
@@ -887,24 +1058,44 @@ document.addEventListener('DOMContentLoaded', function() {
         const metode = metodePembayaran.value;
 
         if (metode === 'tunai' && parseInt(uangBayarValue || "0") < totalHarga) {
-            e.preventDefault();
             alert('Uang bayar kurang! Total: ' + formatRupiah(totalHarga));
             return false;
         }
 
-        // Add hidden inputs for cart data
-        for (let menuId in cart) {
-            const item = cart[menuId];
+        // GROUP cart by menu_id untuk POST
+        // Gabungkan semua item dengan menu_id sama (gratis + normal)
+        const groupedCart = {};
+        for (let cartId in cart) {
+            const item = cart[cartId];
+            if (!groupedCart[item.menu_id]) {
+                groupedCart[item.menu_id] = {
+                    menu_id: item.menu_id,
+                    qty_total: 0,
+                    qty_bayar: 0
+                };
+            }
+            groupedCart[item.menu_id].qty_total += item.qty;
+            if (!item.is_gratis) {
+                groupedCart[item.menu_id].qty_bayar += item.qty;
+            }
+        }
+
+        // POST data
+        for (let menuId in groupedCart) {
+            const data = groupedCart[menuId];
+            
+            // Input menu_id
             const inputMenuId = document.createElement('input');
             inputMenuId.type = 'hidden';
             inputMenuId.name = 'menu_id[]';
-            inputMenuId.value = item.id;
+            inputMenuId.value = data.menu_id;
             this.appendChild(inputMenuId);
 
+            // Input jumlah (qty yang dibayar saja)
             const inputJumlah = document.createElement('input');
             inputJumlah.type = 'hidden';
             inputJumlah.name = 'jumlah[]';
-            inputJumlah.value = item.qty;
+            inputJumlah.value = data.qty_bayar;
             this.appendChild(inputJumlah);
         }
 
@@ -914,7 +1105,9 @@ document.addEventListener('DOMContentLoaded', function() {
         hiddenInput.value = uangBayarValue;
         this.appendChild(hiddenInput);
 
-        return confirm('Proses transaksi sebesar ' + formatRupiah(totalHarga) + '?');
+        if (confirm('Proses transaksi sebesar ' + formatRupiah(totalHarga) + '?')) {
+            this.submit();
+        }
     });
 
     // =================================
@@ -922,8 +1115,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // =================================
     function getTotalHarga() {
         let total = 0;
-        for (let menuId in cart) {
-            total += cart[menuId].harga * cart[menuId].qty;
+        for (let cartId in cart) {
+            const item = cart[cartId];
+            if (!item.is_gratis) {
+                total += item.harga * item.qty;
+            }
         }
         return total;
     }
