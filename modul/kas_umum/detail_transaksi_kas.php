@@ -124,7 +124,7 @@ if ($kas['referensi_type'] == 'penjualan' && $kas['referensi_id']) {
 
                 <?php if ($referensi): ?>
                 <hr>
-                <div class="alert alert-info">
+                <div class="alert alert-hide alert-info">
                     <strong><i class="bi bi-link-45deg"></i> Referensi Transaksi:</strong><br>
                     <?php if ($kas['referensi_type'] == 'penjualan'): ?>
                         No. Transaksi: <strong><?php echo $referensi['no_transaksi']; ?></strong><br>

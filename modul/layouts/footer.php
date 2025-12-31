@@ -9,7 +9,7 @@
         <div class="row">
             <div class="col-md-12">
                 <p class="mb-0">
-                    <i class="bi bi-c-circle"></i> <?php echo date('Y'); ?> Aplikasi Rumah Makan - Tugas PKL
+                    <i class="bi bi-c-circle"></i> <?php echo date('Y'); ?> Aplikasi Rumah Makan - Tugas 
                 </p>
                 <small>
                     Dibuat dengan <i class="bi bi-heart-fill text-danger"></i> menggunakan PHP & MySQL

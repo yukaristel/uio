@@ -107,7 +107,7 @@ if (!$bahan) {
                                 Stok Tersedia: <strong><?php echo number_format($bahan['stok_tersedia'], 2); ?> <?php echo $bahan['satuan']; ?></strong><br>
                                 Nilai Stok: <strong><?php echo formatRupiah($bahan['stok_tersedia'] * $bahan['harga_beli_per_satuan']); ?></strong>
                             </div>
-                            <div class="alert alert-warning">
+                            <div class="alert alert-hide alert-warning">
                                 <i class="bi bi-exclamation-triangle"></i>
                                 <strong>Catatan:</strong> Stok tersedia tidak bisa diubah di sini. 
                                 Gunakan menu <strong>Pembelian Bahan</strong> untuk menambah stok atau 

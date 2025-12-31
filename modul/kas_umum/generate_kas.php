@@ -1,296 +1,387 @@
-<?php
+﻿<?php
 /**
- * GENERATE / REGENERATE DATA KAS
- * Untuk sinkronisasi data kas dari transaksi penjualan dan pembelian
+ * GENERATE ULANG SALDO
+ * Reset dan perbaiki tabel saldo jika terjadi kesalahan
  */
 
-// Cek akses admin only
-if ($_SESSION['role'] != 'admin') {
-    echo "<div class='alert alert-danger'>Akses ditolak! Hanya admin yang dapat mengakses halaman ini.</div>";
-    exit;
+// Get bulan tahun transaksi terawal dan terakhir
+$transaksi_awal = fetchOne("SELECT MIN(tgl_transaksi) as tgl_awal FROM transaksi");
+$transaksi_akhir = fetchOne("SELECT MAX(tgl_transaksi) as tgl_akhir FROM transaksi");
+
+// Cek apakah ada transaksi dan tgl tidak null
+if ($transaksi_awal && $transaksi_awal['tgl_awal']) {
+    $tahun_awal = date('Y', strtotime($transaksi_awal['tgl_awal']));
+} else {
+    $tahun_awal = date('Y');
 }
 
-// Ambil informasi saldo kas terkini
-$saldo_kas = fetchOne("SELECT saldo_sesudah FROM kas_umum ORDER BY created_at DESC, id DESC LIMIT 1");
-$saldo_terkini = $saldo_kas ? $saldo_kas['saldo_sesudah'] : 0;
+if ($transaksi_akhir && $transaksi_akhir['tgl_akhir']) {
+    $tahun_akhir = date('Y', strtotime($transaksi_akhir['tgl_akhir']));
+    $bulan_akhir = date('m', strtotime($transaksi_akhir['tgl_akhir']));
+} else {
+    $tahun_akhir = date('Y');
+    $bulan_akhir = date('m');
+}
 
-// Hitung total transaksi yang perlu disinkronkan
-$total_penjualan_belum_kas = fetchOne("
-    SELECT COUNT(*) as total 
-    FROM transaksi_penjualan tp
-    LEFT JOIN kas_umum k ON k.referensi_type = 'penjualan' AND k.referensi_id = tp.id
-    WHERE k.id IS NULL
-");
-
-$total_pembelian_belum_kas = fetchOne("
-    SELECT COUNT(*) as total 
-    FROM pembelian_bahan pb
-    LEFT JOIN kas_umum k ON k.referensi_type = 'pembelian' AND k.referensi_id = pb.id
-    WHERE k.id IS NULL
-");
-
-// Statistik kas
-$stat_kas = fetchOne("
-    SELECT 
-        COUNT(*) as total_transaksi,
-        COALESCE(SUM(CASE WHEN jenis_transaksi = 'masuk' THEN nominal ELSE 0 END), 0) as total_masuk,
-        COALESCE(SUM(CASE WHEN jenis_transaksi = 'keluar' THEN nominal ELSE 0 END), 0) as total_keluar
-    FROM kas_umum
-");
-
-$total_saldo_kas_record = fetchOne("SELECT COUNT(*) as total FROM saldo_kas");
+// Generate options untuk dropdown
+$bulan_list = [
+    '01' => 'Januari',
+    '02' => 'Februari',
+    '03' => 'Maret',
+    '04' => 'April',
+    '05' => 'Mei',
+    '06' => 'Juni',
+    '07' => 'Juli',
+    '08' => 'Agustus',
+    '09' => 'September',
+    '10' => 'Oktober',
+    '11' => 'November',
+    '12' => 'Desember'
+];
 ?>
 
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2><i class="bi bi-arrow-repeat"></i> Generate & Sinkronisasi Data Kas</h2>
-            <p class="text-muted">Regenerate data kas dari transaksi penjualan dan pembelian</p>
-        </div>
+<div class="row mb-3">
+    <div class="col-md-12">
+        <h2><i class="bi bi-arrow-clockwise"></i> Generate Ulang Saldo</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="index.php?page=dashboard">Dashboard</a></li>
+                <li class="breadcrumb-item active">Generate Saldo</li>
+            </ol>
+        </nav>
     </div>
+</div>
 
-    <!-- Warning Box -->
-    <div class="alert alert-warning">
-        <h5><i class="bi bi-exclamation-triangle"></i> Peringatan Penting!</h5>
-        <ul class="mb-0">
-            <li>Fitur ini akan <strong>menghapus semua data kas yang ada</strong> dan membuat ulang dari transaksi penjualan & pembelian</li>
-            <li>Proses ini <strong>tidak dapat dibatalkan (irreversible)</strong></li>
-            <li>Pastikan <strong>backup database</strong> terlebih dahulu sebelum menjalankan</li>
-            <li>Transaksi kas manual (gaji, operasional, dll) akan <strong>ikut terhapus</strong></li>
-            <li>Gunakan fitur ini hanya jika data kas tidak sinkron atau bermasalah</li>
-        </ul>
-    </div>
-
-    <div class="row mb-4">
-        <!-- Current Status -->
-        <div class="col-md-3">
-            <div class="card dashboard-card card-primary">
-                <div class="card-body text-center">
-                    <h6 class="text-muted">Saldo Kas Terkini</h6>
-                    <h3 class="text-primary"><?php echo formatRupiah($saldo_terkini); ?></h3>
-                </div>
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-warning">
+                <i class="bi bi-exclamation-triangle"></i> Reset dan Generate Ulang Saldo
             </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card dashboard-card card-success">
-                <div class="card-body text-center">
-                    <h6 class="text-muted">Total Kas Masuk</h6>
-                    <h4 class="text-success"><?php echo formatRupiah($stat_kas['total_masuk']); ?></h4>
-                    <small class="text-muted"><?php echo number_format($stat_kas['total_transaksi']); ?> transaksi</small>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card dashboard-card card-danger">
-                <div class="card-body text-center">
-                    <h6 class="text-muted">Total Kas Keluar</h6>
-                    <h4 class="text-danger"><?php echo formatRupiah($stat_kas['total_keluar']); ?></h4>
-                    <small class="text-muted"><?php echo $total_saldo_kas_record['total']; ?> hari dicatat</small>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card dashboard-card card-warning">
-                <div class="card-body text-center">
-                    <h6 class="text-muted">Transaksi Belum Sinkron</h6>
-                    <h4 class="text-warning">
-                        <?php echo ($total_penjualan_belum_kas['total'] + $total_pembelian_belum_kas['total']); ?>
-                    </h4>
-                    <small class="text-muted">
-                        Penjualan: <?php echo $total_penjualan_belum_kas['total']; ?> | 
-                        Pembelian: <?php echo $total_pembelian_belum_kas['total']; ?>
-                    </small>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Action Cards -->
-    <div class="row">
-        <!-- Full Regenerate -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0"><i class="bi bi-trash"></i> Full Regenerate (Reset Total)</h5>
-                </div>
-                <div class="card-body">
-                    <div class="alert alert-danger">
-                        <strong>Bahaya!</strong> Ini akan menghapus SEMUA data kas dan membuat ulang dari awal.
-                    </div>
-                    
-                    <h6>Yang akan dilakukan:</h6>
-                    <ul>
-                        <li>Hapus semua data di tabel <code>kas_umum</code></li>
-                        <li>Hapus semua data di tabel <code>saldo_kas</code></li>
-                        <li>Generate ulang kas dari semua transaksi penjualan</li>
-                        <li>Generate ulang kas dari semua pembelian bahan</li>
-                        <li>Buat record saldo kas harian</li>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h5><i class="bi bi-info-circle"></i> Informasi</h5>
+                    <ul class="mb-0">
+                        <li>Fitur ini digunakan untuk <strong>memperbaiki saldo</strong> yang salah atau tidak sinkron</li>
+                        <li>Pilih bulan dan tahun <strong>mulai dari bulan yang salah</strong></li>
+                        <li>Sistem akan generate ulang saldo dari bulan tersebut hingga <strong>bulan saat ini</strong></li>
+                        <li>Proses akan menghapus saldo lama dan menghitung ulang dari transaksi</li>
                     </ul>
-
-                    <form action="config/generate_kas_proses.php?action=full_regenerate" method="POST" id="formFullRegenerate">
-                        <div class="mb-3">
-                            <label class="form-label">Konfirmasi dengan mengetik: <strong>REGENERATE</strong></label>
-                            <input type="text" class="form-control" id="confirmFull" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Saldo Awal Modal (Rp)</label>
-                            <input type="number" class="form-control" name="saldo_awal" value="1000000" required>
-                            <small class="text-muted">Saldo kas awal sebelum transaksi pertama</small>
-                        </div>
-                        <button type="submit" class="btn btn-danger w-100" id="btnFullRegenerate" disabled>
-                            <i class="bi bi-trash"></i> REGENERATE SEMUA DATA KAS
-                        </button>
-                    </form>
                 </div>
-            </div>
-        </div>
 
-        <!-- Sync Only -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> Sinkronisasi Transaksi Baru</h5>
-                </div>
-                <div class="card-body">
-                    <div class="alert alert-warning">
-                        <strong>Hati-hati!</strong> Ini akan menambahkan kas untuk transaksi yang belum tercatat.
-                    </div>
-                    
-                    <h6>Yang akan dilakukan:</h6>
-                    <ul>
-                        <li>Cari transaksi penjualan yang belum ada di kas_umum</li>
-                        <li>Cari pembelian bahan yang belum ada di kas_umum</li>
-                        <li>Tambahkan entry kas untuk transaksi tersebut</li>
-                        <li>Update saldo kas harian</li>
-                        <li><strong>Data kas yang sudah ada tidak akan dihapus</strong></li>
-                    </ul>
-
-                    <div class="mb-3">
-                        <p class="mb-1"><strong>Transaksi yang akan disinkronkan:</strong></p>
-                        <ul class="list-unstyled">
-                            <li><i class="bi bi-cart-check text-success"></i> Penjualan: <strong><?php echo $total_penjualan_belum_kas['total']; ?></strong> transaksi</li>
-                            <li><i class="bi bi-bag-x text-danger"></i> Pembelian: <strong><?php echo $total_pembelian_belum_kas['total']; ?></strong> transaksi</li>
-                        </ul>
-                    </div>
-
-                    <?php if (($total_penjualan_belum_kas['total'] + $total_pembelian_belum_kas['total']) == 0): ?>
-                        <div class="alert alert-success">
-                            <i class="bi bi-check-circle"></i> Semua transaksi sudah tersinkronisasi dengan kas!
-                        </div>
-                        <button type="button" class="btn btn-warning w-100" disabled>
-                            <i class="bi bi-check-circle"></i> TIDAK ADA YANG PERLU DISINKRONKAN
-                        </button>
-                    <?php else: ?>
-                        <form action="config/generate_kas_proses.php?action=sync_only" method="POST" id="formSyncOnly">
+                <form id="formGenerate">
+                    <div class="row">
+                        <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="form-label">Konfirmasi dengan mengetik: <strong>SYNC</strong></label>
-                                <input type="text" class="form-control" id="confirmSync" required>
+                                <label class="form-label">Bulan Mulai *</label>
+                                <select class="form-select" name="bulan_mulai" id="bulanMulai" required>
+                                    <option value="">-- Pilih Bulan --</option>
+                                    <?php foreach($bulan_list as $key => $value): ?>
+                                    <option value="<?php echo $key; ?>"><?php echo $value; ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
-                            <button type="submit" class="btn btn-warning w-100 text-dark" id="btnSyncOnly" disabled>
-                                <i class="bi bi-arrow-repeat"></i> SINKRONISASI TRANSAKSI BARU
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Tahun Mulai *</label>
+                                <select class="form-select" name="tahun_mulai" id="tahunMulai" required>
+                                    <option value="">-- Pilih Tahun --</option>
+                                    <?php for($y = $tahun_awal; $y <= $tahun_akhir; $y++): ?>
+                                    <option value="<?php echo $y; ?>"><?php echo $y; ?></option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12">
+                            <div class="alert alert-warning" id="alertInfo" style="display:none;">
+                                <strong><i class="bi bi-calendar-check"></i> Akan Generate:</strong><br>
+                                <span id="rangeInfo"></span>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12">
+                            <button type="submit" class="btn btn-warning" id="btnGenerate">
+                                <i class="bi bi-arrow-clockwise"></i> Mulai Generate
                             </button>
-                        </form>
-                    <?php endif; ?>
+                            <a href="index.php?page=dashboard" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> Batal
+                            </a>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Progress Container -->
+                <div id="progressContainer" style="display:none;" class="mt-4">
+                    <hr>
+                    <h5><i class="bi bi-gear"></i> Proses Generate</h5>
+                    
+                    <div class="mb-3">
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 id="progressBar" role="progressbar" 
+                                 style="width: 0%">0%</div>
+                        </div>
+                    </div>
+
+                    <div id="logContainer" class="border rounded p-3" 
+                         style="background-color: #f8f9fa; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 13px;">
+                        <div id="logContent"></div>
+                    </div>
+
+                    <div class="mt-3" id="btnSelesaiContainer" style="display:none;">
+                        <a href="index.php?page=list_transaksi" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> Selesai, Lihat Transaksi
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Info Card -->
-    <div class="card mt-4">
-        <div class="card-header bg-info text-white">
-            <h5 class="mb-0"><i class="bi bi-info-circle"></i> Kapan Menggunakan Fitur Ini?</h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <h6><i class="bi bi-check-circle text-success"></i> Gunakan <strong>Full Regenerate</strong> jika:</h6>
-                    <ul>
-                        <li>Data kas berantakan atau tidak akurat</li>
-                        <li>Saldo kas tidak sesuai dengan transaksi</li>
-                        <li>Ada kesalahan perhitungan yang sistemik</li>
-                        <li>Ingin memulai pencatatan kas dari awal</li>
-                        <li>Setelah import data transaksi massal</li>
-                    </ul>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <i class="bi bi-calendar-range"></i> Data Transaksi
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="text-muted">Transaksi Terawal:</label>
+                    <h6>
+                        <?php 
+                        if($transaksi_awal && $transaksi_awal['tgl_awal']) {
+                            echo date('d F Y', strtotime($transaksi_awal['tgl_awal']));
+                        } else {
+                            echo 'Belum ada transaksi';
+                        }
+                        ?>
+                    </h6>
                 </div>
-                <div class="col-md-6">
-                    <h6><i class="bi bi-check-circle text-warning"></i> Gunakan <strong>Sinkronisasi</strong> jika:</h6>
-                    <ul>
-                        <li>Ada transaksi baru yang belum tercatat di kas</li>
-                        <li>Sistem kas sempat offline/error</li>
-                        <li>Data kas lama masih benar, hanya perlu update</li>
-                        <li>Ingin menambahkan kas tanpa hapus data lama</li>
-                    </ul>
+                <div class="mb-3">
+                    <label class="text-muted">Transaksi Terakhir:</label>
+                    <h6>
+                        <?php 
+                        if($transaksi_akhir && $transaksi_akhir['tgl_akhir']) {
+                            echo date('d F Y', strtotime($transaksi_akhir['tgl_akhir']));
+                        } else {
+                            echo 'Belum ada transaksi';
+                        }
+                        ?>
+                    </h6>
+                </div>
+                <hr>
+                <div class="mb-0">
+                    <label class="text-muted">Total Transaksi:</label>
+                    <h5>
+                        <?php 
+                        $total = fetchOne("SELECT COUNT(*) as total FROM transaksi");
+                        echo number_format($total['total']);
+                        ?> transaksi
+                    </h5>
                 </div>
             </div>
-            <hr>
-            <p class="mb-0 text-danger"><strong>Catatan:</strong> Selalu backup database sebelum menjalankan operasi ini!</p>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header bg-danger text-white">
+                <i class="bi bi-exclamation-octagon"></i> Peringatan
+            </div>
+            <div class="card-body">
+                <ul class="mb-0 small text-danger">
+                    <li>Proses ini akan <strong>menghapus</strong> saldo lama</li>
+                    <li>Pastikan periode yang dipilih sudah <strong>benar</strong></li>
+                    <li>Jangan tutup halaman saat proses berlangsung</li>
+                    <li>Backup database direkomendasikan</li>
+                </ul>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-// Konfirmasi Full Regenerate
-document.getElementById('confirmFull').addEventListener('input', function() {
-    const btn = document.getElementById('btnFullRegenerate');
-    if (this.value === 'REGENERATE') {
-        btn.disabled = false;
-    } else {
-        btn.disabled = true;
-    }
-});
+const bulanList = <?php echo json_encode($bulan_list); ?>;
+const tahunAkhir = <?php echo $tahun_akhir; ?>;
+const bulanAkhir = '<?php echo $bulan_akhir; ?>';
 
-document.getElementById('formFullRegenerate').addEventListener('submit', function(e) {
-    if (!confirm('PERINGATAN TERAKHIR!\n\nAnda akan menghapus SEMUA data kas dan membuat ulang dari awal.\n\nApakah Anda yakin ingin melanjutkan?')) {
-        e.preventDefault();
-        return false;
+// Update info range
+document.getElementById('bulanMulai').addEventListener('change', updateRangeInfo);
+document.getElementById('tahunMulai').addEventListener('change', updateRangeInfo);
+
+function updateRangeInfo() {
+    const bulan = document.getElementById('bulanMulai').value;
+    const tahun = document.getElementById('tahunMulai').value;
+    
+    if (bulan && tahun) {
+        const namaBulanMulai = bulanList[bulan];
+        const namaBulanAkhir = bulanList[bulanAkhir];
+        
+        document.getElementById('rangeInfo').innerHTML = 
+            `Dari <strong>${namaBulanMulai} ${tahun}</strong> hingga <strong>${namaBulanAkhir} ${tahunAkhir}</strong>`;
+        document.getElementById('alertInfo').style.display = 'block';
+    } else {
+        document.getElementById('alertInfo').style.display = 'none';
+    }
+}
+
+// Handle form submit
+document.getElementById('formGenerate').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const bulan = document.getElementById('bulanMulai').value;
+    const tahun = document.getElementById('tahunMulai').value;
+    
+    if (!confirm('Apakah Anda yakin ingin generate ulang saldo?\n\nProses ini akan menghapus saldo lama dan menghitung ulang dari transaksi.')) {
+        return;
     }
     
-    // Show loading
-    const btn = document.getElementById('btnFullRegenerate');
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Memproses...';
-    btn.disabled = true;
+    // Disable form
+    document.getElementById('btnGenerate').disabled = true;
+    document.getElementById('bulanMulai').disabled = true;
+    document.getElementById('tahunMulai').disabled = true;
+    
+    // Show progress
+    document.getElementById('progressContainer').style.display = 'block';
+    
+    // Start generate
+    await generateSaldo(tahun, bulan);
 });
 
-// Konfirmasi Sync Only
-document.getElementById('confirmSync')?.addEventListener('input', function() {
-    const btn = document.getElementById('btnSyncOnly');
-    if (this.value === 'SYNC') {
-        btn.disabled = false;
-    } else {
-        btn.disabled = true;
+async function generateSaldo(tahunMulai, bulanMulai) {
+    const logContent = document.getElementById('logContent');
+    const progressBar = document.getElementById('progressBar');
+    
+    addLog('🚀 Memulai proses generate saldo...', 'primary');
+    addLog(`📅 Periode: ${bulanList[bulanMulai]} ${tahunMulai} - ${bulanList[bulanAkhir]} ${tahunAkhir}`, 'info');
+    addLog('');
+    
+    try {
+        // Generate list bulan yang akan diproses
+        const bulanList = generateMonthList(tahunMulai, bulanMulai, tahunAkhir, bulanAkhir);
+        const total = bulanList.length;
+        
+        addLog(`📊 Total bulan yang akan diproses: ${total} bulan`, 'info');
+        addLog('');
+        
+        let processed = 0;
+        
+        for (const item of bulanList) {
+            processed++;
+            const progress = Math.round((processed / total) * 100);
+            
+            addLog(`⏳ [${processed}/${total}] Memproses ${item.nama}...`, 'warning');
+            
+            // Call backend
+            const response = await fetch('config/simpan_saldo_proses.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `tahun=${item.tahun}&bulan=${item.bulan}`
+            });
+            
+            // Cek apakah response OK
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const text = await response.text();
+            
+            // Debug: tampilkan raw response jika bukan JSON
+            let result;
+            try {
+                result = JSON.parse(text);
+            } catch (e) {
+                console.error('Response bukan JSON:', text);
+                addLog(`❌ ${item.nama}: Response error (bukan JSON)`, 'danger');
+                addLog(`Raw response: ${text.substring(0, 200)}...`, 'danger');
+                continue;
+            }
+            
+            if (result.success) {
+                addLog(`✅ ${item.nama}: ${result.total_akun} akun berhasil di-generate`, 'success');
+            } else {
+                addLog(`❌ ${item.nama}: ${result.message}`, 'danger');
+            }
+            
+            // Update progress bar
+            progressBar.style.width = progress + '%';
+            progressBar.textContent = progress + '%';
+            
+            // Scroll to bottom
+            logContent.parentElement.scrollTop = logContent.parentElement.scrollHeight;
+            
+            // Small delay untuk visual
+            await sleep(300);
+        }
+        
+        addLog('');
+        addLog('🎉 SELESAI! Semua saldo berhasil di-generate ulang.', 'success');
+        addLog('📝 Silakan cek laporan untuk memastikan saldo sudah benar.', 'info');
+        
+        // Show button selesai
+        document.getElementById('btnSelesaiContainer').style.display = 'block';
+        
+    } catch (error) {
+        addLog('');
+        addLog('❌ ERROR: ' + error.message, 'danger');
     }
-});
+}
 
-document.getElementById('formSyncOnly')?.addEventListener('submit', function(e) {
-    if (!confirm('Anda akan menambahkan entry kas untuk transaksi yang belum tercatat.\n\nProses ini akan mengubah saldo kas terkini.\n\nLanjutkan?')) {
-        e.preventDefault();
-        return false;
+function generateMonthList(tahunMulai, bulanMulai, tahunAkhir, bulanAkhir) {
+    const list = [];
+    let currentYear = parseInt(tahunMulai);
+    let currentMonth = parseInt(bulanMulai);
+    const endYear = parseInt(tahunAkhir);
+    const endMonth = parseInt(bulanAkhir);
+    
+    while (currentYear < endYear || (currentYear === endYear && currentMonth <= endMonth)) {
+        const bulanPad = String(currentMonth).padStart(2, '0');
+        list.push({
+            tahun: currentYear,
+            bulan: bulanPad,
+            nama: bulanList[bulanPad] + ' ' + currentYear
+        });
+        
+        currentMonth++;
+        if (currentMonth > 12) {
+            currentMonth = 1;
+            currentYear++;
+        }
     }
     
-    // Show loading
-    const btn = document.getElementById('btnSyncOnly');
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Memproses...';
-    btn.disabled = true;
-});
+    return list;
+}
+
+function addLog(message, type = '') {
+    const logContent = document.getElementById('logContent');
+    const time = new Date().toLocaleTimeString('id-ID');
+    
+    let colorClass = '';
+    if (type === 'success') colorClass = 'text-success';
+    else if (type === 'danger') colorClass = 'text-danger';
+    else if (type === 'warning') colorClass = 'text-warning';
+    else if (type === 'info') colorClass = 'text-info';
+    else if (type === 'primary') colorClass = 'text-primary';
+    
+    const logLine = document.createElement('div');
+    logLine.className = colorClass;
+    logLine.textContent = message ? `[${time}] ${message}` : '';
+    
+    logContent.appendChild(logLine);
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 </script>
 
 <style>
-.card-body ul {
-    margin-bottom: 1rem;
+#logContainer {
+    line-height: 1.6;
 }
-
-.card-body ul li {
-    margin-bottom: 0.5rem;
-}
-
-code {
-    background: #f8f9fa;
-    padding: 2px 6px;
-    border-radius: 4px;
-    color: #d63384;
+#logContent div {
+    margin-bottom: 2px;
 }
 </style>

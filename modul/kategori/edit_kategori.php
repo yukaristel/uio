@@ -99,7 +99,7 @@ $jumlah_menu = fetchOne("SELECT COUNT(*) as total FROM menu_makanan WHERE katego
         </div>
 
         <?php if ($jumlah_menu['total'] > 0): ?>
-        <div class="alert alert-warning mt-3">
+        <div class="alert alert-hide alert-warning mt-3">
             <i class="bi bi-exclamation-triangle"></i>
             <strong>Perhatian:</strong> Untuk menghapus kategori ini, pindahkan atau hapus semua menu terlebih dahulu.
         </div>

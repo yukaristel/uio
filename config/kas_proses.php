@@ -1,15 +1,16 @@
 <?php
 /**
- * PROSES KAS UMUM (Manual Transaction & Rekonsiliasi)
- * Step 24/64 (37.5%)
+ * PROSES TRANSAKSI
+ * Menggunakan Double Entry System
+ * Modified: Tanpa validasi saldo + Fitur jurnal pembalik
  */
 
 session_start();
 require_once 'database.php';
 
-// Cek login dan akses admin
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
-    $_SESSION['error'] = 'Anda tidak memiliki akses!';
+// Cek login
+if (!isset($_SESSION['user_id'])) {
+    $_SESSION['error'] = 'Anda harus login terlebih dahulu!';
     header('Location: ../index.php');
     exit;
 }
@@ -18,65 +19,55 @@ $action = isset($_GET['action']) ? $_GET['action'] : '';
 
 switch ($action) {
     case 'create':
-        createTransaksiKas();
+        createTransaksi();
         break;
-    case 'rekonsiliasi':
-        rekonsiliasi();
+    case 'delete':
+        deleteTransaksi();
+        break;
+    case 'reverse':
+        reverseTransaksi();
         break;
     default:
-        header('Location: ../index.php?page=list_transaksi_kas');
+        header('Location: ../index.php?page=list_transaksi');
         exit;
 }
 
 /**
- * CREATE - Tambah Transaksi Kas Manual
- * (Untuk gaji, operasional, investasi, dll)
+ * CREATE - Tambah Transaksi
  */
-function createTransaksiKas() {
+function createTransaksi() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        header('Location: ../index.php?page=tambah_transaksi_kas');
+        header('Location: ../index.php?page=tambah_transaksi');
         exit;
     }
     
     $jenis_transaksi = $_POST['jenis_transaksi'];
-    $kategori = $_POST['kategori'];
-    $nominal = floatval($_POST['nominal']);
-    $keterangan = trim($_POST['keterangan']);
-    $tanggal_transaksi = $_POST['tanggal_transaksi'] . ' ' . date('H:i:s');
+    $rekening_debet = $_POST['rekening_debet'];
+    $rekening_kredit = $_POST['rekening_kredit'];
+    $jumlah = floatval($_POST['jumlah']);
+    $keterangan = trim($_POST['keterangan_transaksi']);
+    $tgl_transaksi = $_POST['tgl_transaksi'];
     
-    // Validasi
-    if (empty($jenis_transaksi) || empty($kategori) || $nominal <= 0) {
+    // Validasi dasar
+    if (empty($rekening_debet) || empty($rekening_kredit) || $jumlah <= 0) {
         $_SESSION['error'] = 'Semua field harus diisi dengan benar!';
-        header('Location: ../index.php?page=tambah_transaksi_kas');
+        header('Location: ../index.php?page=tambah_transaksi');
         exit;
     }
     
-    // Validasi kategori manual
-    $kategori_manual = ['gaji', 'operasional', 'investasi', 'lainnya'];
-    if (!in_array($kategori, $kategori_manual)) {
-        $_SESSION['error'] = 'Kategori tidak valid untuk transaksi manual!';
-        header('Location: ../index.php?page=tambah_transaksi_kas');
+    // Validasi tidak boleh sama
+    if ($rekening_debet === $rekening_kredit) {
+        $_SESSION['error'] = 'Rekening debet dan kredit tidak boleh sama!';
+        header('Location: ../index.php?page=tambah_transaksi');
         exit;
     }
     
-    // Get saldo terakhir
-    $saldo_sebelum = getSaldoKasTerakhir();
+    // VALIDASI SALDO DIHAPUS - Biarkan transaksi jalan walaupun minus
+    // Sesuai konsep akuntansi, saldo bisa minus (overdraft, dll)
     
-    // Validasi saldo cukup untuk pengeluaran
-    if ($jenis_transaksi == 'keluar') {
-        if ($saldo_sebelum < $nominal) {
-            $_SESSION['error'] = 'Saldo kas tidak cukup! Saldo: ' . formatRupiah($saldo_sebelum) . 
-                               ', Dibutuhkan: ' . formatRupiah($nominal);
-            header('Location: ../index.php?page=tambah_transaksi_kas');
-            exit;
-        }
-    }
-    
-    // Hitung saldo sesudah
-    if ($jenis_transaksi == 'masuk') {
-        $saldo_sesudah = $saldo_sebelum + $nominal;
-    } else {
-        $saldo_sesudah = $saldo_sebelum - $nominal;
+    // Auto generate keterangan jika kosong
+    if (empty($keterangan)) {
+        $keterangan = generateKeteranganOtomatis($rekening_debet, $rekening_kredit, $jenis_transaksi);
     }
     
     // START TRANSACTION
@@ -84,73 +75,101 @@ function createTransaksiKas() {
     try {
         $conn->begin_transaction();
         
-        // Generate nomor kas
-        $no_kas = generateNoKas();
-        
-        // Insert kas_umum
-        $sql = "INSERT INTO kas_umum 
-            (no_transaksi_kas, tanggal_transaksi, jenis_transaksi, kategori, nominal, 
-            saldo_sebelum, saldo_sesudah, referensi_type, keterangan, user_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?)";
+        // Insert transaksi
+        $sql = "INSERT INTO transaksi 
+                (tgl_transaksi, rekening_debet, rekening_kredit, keterangan_transaksi, jumlah, id_user) 
+                VALUES (?, ?, ?, ?, ?, ?)";
         
         $result = execute($sql, [
-            $no_kas, $tanggal_transaksi, $jenis_transaksi, $kategori, $nominal,
-            $saldo_sebelum, $saldo_sesudah, $keterangan, $_SESSION['user_id']
+            $tgl_transaksi,
+            $rekening_debet,
+            $rekening_kredit,
+            $keterangan,
+            $jumlah,
+            $_SESSION['user_id']
         ]);
         
         if (!$result['success']) {
-            throw new Exception('Gagal insert transaksi kas!');
+            throw new Exception('Gagal insert transaksi!');
         }
         
-        // Update saldo_kas harian
-        updateSaldoKasHarian($jenis_transaksi, $nominal);
+        $transaksi_id = $result['insert_id'];
+        
+        // Jika pembelian inventaris, insert ke aset_tetap
+        $tipe_pengeluaran = isset($_POST['tipe_pengeluaran']) ? $_POST['tipe_pengeluaran'] : '';
+        
+        if ($tipe_pengeluaran === 'inventaris') {
+            $nama_barang = trim($_POST['nama_barang']);
+            $unit = intval($_POST['unit']);
+            $harsat = floatval($_POST['harsat']);
+            $umur_ekonomis = isset($_POST['umur_ekonomis']) ? intval($_POST['umur_ekonomis']) : null;
+            $jenis = $_POST['jenis'];
+            
+            $sql_aset = "INSERT INTO aset_tetap 
+                        (nama_barang, tgl_beli, unit, harsat, umur_ekonomis, jenis, status) 
+                        VALUES (?, ?, ?, ?, ?, ?, 'Baik')";
+            
+            $result_aset = execute($sql_aset, [
+                $nama_barang,
+                $tgl_transaksi,
+                $unit,
+                $harsat,
+                $umur_ekonomis,
+                $jenis
+            ]);
+            
+            if (!$result_aset['success']) {
+                throw new Exception('Gagal insert aset tetap!');
+            }
+        }
         
         // COMMIT
         $conn->commit();
         
-        $_SESSION['success'] = 'Transaksi kas berhasil dicatat! No: ' . $no_kas . 
-                               ', Saldo: ' . formatRupiah($saldo_sesudah);
-        header('Location: ../index.php?page=list_transaksi_kas');
+        $pesan_sukses = 'Transaksi berhasil dicatat!';
+        if ($tipe_pengeluaran === 'inventaris') {
+            $pesan_sukses .= ' Inventaris juga telah ditambahkan.';
+        }
+        
+        // Cek apakah ada saldo yang minus
+        $saldo_minus = cekSaldoMinus($rekening_kredit);
+        if ($saldo_minus < 0 && isKasBank($rekening_kredit)) {
+            $nama_akun = getNamaRekening($rekening_kredit);
+            $pesan_sukses .= '<br><span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Perhatian: Saldo ' . 
+                           $nama_akun . ' sekarang: ' . formatRupiah($saldo_minus) . ' (MINUS)</span>';
+        }
+        
+        $_SESSION['success'] = $pesan_sukses;
+        header('Location: ../index.php?page=list_transaksi');
         
     } catch (Exception $e) {
         // ROLLBACK
         $conn->rollback();
-        $_SESSION['error'] = 'Gagal catat transaksi kas: ' . $e->getMessage();
-        header('Location: ../index.php?page=tambah_transaksi_kas');
+        $_SESSION['error'] = 'Gagal catat transaksi: ' . $e->getMessage();
+        header('Location: ../index.php?page=tambah_transaksi');
     }
     
     exit;
 }
 
 /**
- * REKONSILIASI - Sesuaikan Saldo Kas dengan Kas Fisik
+ * DELETE - Hapus Transaksi
  */
-function rekonsiliasi() {
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        header('Location: ../index.php?page=rekonsiliasi_kas');
+function deleteTransaksi() {
+    if (!isset($_GET['id'])) {
+        $_SESSION['error'] = 'ID transaksi tidak valid!';
+        header('Location: ../index.php?page=list_transaksi');
         exit;
     }
     
-    $saldo_fisik = floatval($_POST['saldo_fisik']);
-    $keterangan = trim($_POST['keterangan']);
+    $id = intval($_GET['id']);
     
-    // Validasi
-    if ($saldo_fisik < 0) {
-        $_SESSION['error'] = 'Saldo fisik tidak valid!';
-        header('Location: ../index.php?page=rekonsiliasi_kas');
-        exit;
-    }
+    // Cek apakah transaksi ada
+    $transaksi = fetchOne("SELECT * FROM transaksi WHERE id = ?", [$id]);
     
-    // Get saldo sistem
-    $saldo_sistem = getSaldoKasTerakhir();
-    
-    // Hitung selisih
-    $selisih = $saldo_fisik - $saldo_sistem;
-    
-    // Jika tidak ada selisih
-    if ($selisih == 0) {
-        $_SESSION['success'] = 'Saldo kas sudah sesuai! Tidak ada selisih.';
-        header('Location: ../index.php?page=rekonsiliasi_kas');
+    if (!$transaksi) {
+        $_SESSION['error'] = 'Transaksi tidak ditemukan!';
+        header('Location: ../index.php?page=list_transaksi');
         exit;
     }
     
@@ -159,119 +178,173 @@ function rekonsiliasi() {
     try {
         $conn->begin_transaction();
         
-        // Generate nomor kas
-        $no_kas = generateNoKas();
-        
-        // Tentukan jenis transaksi
-        if ($selisih > 0) {
-            // Kas fisik lebih besar (ada pemasukan yang tidak tercatat)
-            $jenis_transaksi = 'masuk';
-            $kategori = 'lainnya';
-            $nominal = abs($selisih);
-            $keterangan_full = "Rekonsiliasi Kas - Selisih lebih: " . formatRupiah($selisih) . ". " . $keterangan;
-        } else {
-            // Kas fisik lebih kecil (ada pengeluaran yang tidak tercatat / kehilangan)
-            $jenis_transaksi = 'keluar';
-            $kategori = 'lainnya';
-            $nominal = abs($selisih);
-            $keterangan_full = "Rekonsiliasi Kas - Selisih kurang: " . formatRupiah(abs($selisih)) . ". " . $keterangan;
-        }
-        
-        // Insert transaksi adjustment
-        $sql = "INSERT INTO kas_umum 
-            (no_transaksi_kas, tanggal_transaksi, jenis_transaksi, kategori, nominal, 
-            saldo_sebelum, saldo_sesudah, referensi_type, keterangan, user_id) 
-            VALUES (?, NOW(), ?, ?, ?, ?, ?, 'manual', ?, ?)";
-        
-        $result = execute($sql, [
-            $no_kas, $jenis_transaksi, $kategori, $nominal,
-            $saldo_sistem, $saldo_fisik, $keterangan_full, $_SESSION['user_id']
-        ]);
+        // Delete transaksi
+        $sql = "DELETE FROM transaksi WHERE id = ?";
+        $result = execute($sql, [$id]);
         
         if (!$result['success']) {
-            throw new Exception('Gagal insert transaksi adjustment!');
+            throw new Exception('Gagal hapus transaksi!');
         }
-        
-        // Update saldo_kas harian
-        updateSaldoKasHarian($jenis_transaksi, $nominal);
         
         // COMMIT
         $conn->commit();
         
-        if ($selisih > 0) {
-            $_SESSION['success'] = 'Rekonsiliasi berhasil! Selisih lebih: ' . formatRupiah($selisih) . 
-                                   '. Saldo disesuaikan ke: ' . formatRupiah($saldo_fisik);
-        } else {
-            $_SESSION['warning'] = 'Rekonsiliasi berhasil! Selisih kurang: ' . formatRupiah(abs($selisih)) . 
-                                   '. Saldo disesuaikan ke: ' . formatRupiah($saldo_fisik);
-        }
-        
-        header('Location: ../index.php?page=rekonsiliasi_kas');
+        $_SESSION['success'] = 'Transaksi berhasil dihapus!';
+        header('Location: ../index.php?page=list_transaksi');
         
     } catch (Exception $e) {
         // ROLLBACK
         $conn->rollback();
-        $_SESSION['error'] = 'Gagal rekonsiliasi: ' . $e->getMessage();
-        header('Location: ../index.php?page=rekonsiliasi_kas');
+        $_SESSION['error'] = 'Gagal hapus transaksi: ' . $e->getMessage();
+        header('Location: ../index.php?page=list_transaksi');
     }
     
     exit;
 }
 
 /**
- * HELPER: Get Saldo Kas Terakhir
+ * REVERSE - Jurnal Pembalik (untuk koreksi)
+ * Membuat jurnal kebalikan dari transaksi yang salah
  */
-function getSaldoKasTerakhir() {
-    $result = fetchOne("SELECT saldo_sesudah FROM kas_umum ORDER BY created_at DESC, id DESC LIMIT 1");
-    return $result ? $result['saldo_sesudah'] : 0;
+function reverseTransaksi() {
+    if (!isset($_GET['id'])) {
+        $_SESSION['error'] = 'ID transaksi tidak valid!';
+        header('Location: ../index.php?page=list_transaksi');
+        exit;
+    }
+    
+    $id = intval($_GET['id']);
+    
+    // Ambil data transaksi asli
+    $transaksi = fetchOne("SELECT * FROM transaksi WHERE id = ?", [$id]);
+    
+    if (!$transaksi) {
+        $_SESSION['error'] = 'Transaksi tidak ditemukan!';
+        header('Location: ../index.php?page=list_transaksi');
+        exit;
+    }
+    
+    // START TRANSACTION
+    $conn = getConnection();
+    try {
+        $conn->begin_transaction();
+        
+        // Insert jurnal pembalik (DEBET <-> KREDIT dibalik)
+        $keterangan_pembalik = "[PEMBALIK] " . $transaksi['keterangan_transaksi'] . 
+                              " (Ref ID: " . $transaksi['id'] . ")";
+        
+        $sql = "INSERT INTO transaksi 
+                (tgl_transaksi, rekening_debet, rekening_kredit, keterangan_transaksi, jumlah, id_user) 
+                VALUES (?, ?, ?, ?, ?, ?)";
+        
+        $result = execute($sql, [
+            date('Y-m-d'), // Tanggal hari ini
+            $transaksi['rekening_kredit'], // BALIK: kredit jadi debet
+            $transaksi['rekening_debet'],   // BALIK: debet jadi kredit
+            $keterangan_pembalik,
+            $transaksi['jumlah'],
+            $_SESSION['user_id']
+        ]);
+        
+        if (!$result['success']) {
+            throw new Exception('Gagal buat jurnal pembalik!');
+        }
+        
+        $transaksi_pembalik_id = $result['insert_id'];
+        
+        // Update transaksi asli: tambah flag sudah dibalik
+        $sql_update = "UPDATE transaksi 
+                      SET keterangan_transaksi = CONCAT(keterangan_transaksi, ' [SUDAH DIBALIK - Ref: ', ?, ']')
+                      WHERE id = ?";
+        
+        execute($sql_update, [$transaksi_pembalik_id, $id]);
+        
+        // COMMIT
+        $conn->commit();
+        
+        $_SESSION['success'] = 'Jurnal pembalik berhasil dibuat! Transaksi ID: ' . $transaksi_pembalik_id;
+        header('Location: ../index.php?page=list_transaksi');
+        
+    } catch (Exception $e) {
+        // ROLLBACK
+        $conn->rollback();
+        $_SESSION['error'] = 'Gagal buat jurnal pembalik: ' . $e->getMessage();
+        header('Location: ../index.php?page=list_transaksi');
+    }
+    
+    exit;
 }
 
 /**
- * HELPER: Update Saldo Kas Harian
+ * HELPER: Cek apakah rekening adalah Kas/Bank
  */
-function updateSaldoKasHarian($jenis, $nominal) {
-    $today = date('Y-m-d');
+function isKasBank($kode_akun) {
+    $rekening = fetchOne("SELECT * FROM chart_of_accounts WHERE kode_akun = ?", [$kode_akun]);
     
-    // Cek apakah sudah ada record hari ini
-    $cek = fetchOne("SELECT * FROM saldo_kas WHERE tanggal = ?", [$today]);
+    if (!$rekening) return false;
     
-    if ($cek) {
-        // Update existing
-        if ($jenis == 'masuk') {
-            $sql = "UPDATE saldo_kas 
-                    SET total_masuk = total_masuk + ?, 
-                        saldo_akhir = saldo_akhir + ? 
-                    WHERE tanggal = ?";
-        } else {
-            $sql = "UPDATE saldo_kas 
-                    SET total_keluar = total_keluar + ?, 
-                        saldo_akhir = saldo_akhir - ? 
-                    WHERE tanggal = ?";
-        }
-        execute($sql, [$nominal, $nominal, $today]);
-    } else {
-        // Insert new
-        $kemarin = date('Y-m-d', strtotime('-1 day'));
-        $saldo_kemarin = fetchOne("SELECT saldo_akhir FROM saldo_kas WHERE tanggal <= ? ORDER BY tanggal DESC LIMIT 1", [$kemarin]);
-        
-        $saldo_awal = $saldo_kemarin ? $saldo_kemarin['saldo_akhir'] : getSaldoKasTerakhir();
-        if ($jenis == 'masuk') {
-            $saldo_awal = $saldo_awal - $nominal;
-        }
-        
-        if ($jenis == 'masuk') {
-            $total_masuk = $nominal;
-            $total_keluar = 0;
-            $saldo_akhir = $saldo_awal + $nominal;
-        } else {
-            $total_masuk = 0;
-            $total_keluar = $nominal;
-            $saldo_akhir = $saldo_awal - $nominal;
-        }
-        
-        $sql = "INSERT INTO saldo_kas (tanggal, saldo_awal, total_masuk, total_keluar, saldo_akhir) 
-                VALUES (?, ?, ?, ?, ?)";
-        execute($sql, [$today, $saldo_awal, $total_masuk, $total_keluar, $saldo_akhir]);
+    // Kas dan Bank = lev1:1, lev2:1
+    return ($rekening['lev1'] == 1 && $rekening['lev2'] == 1);
+}
+
+/**
+ * HELPER: Get Saldo Rekening
+ */
+function getSaldoRekening($kode_akun) {
+    $rekening = fetchOne("SELECT jenis_mutasi FROM chart_of_accounts WHERE kode_akun = ?", [$kode_akun]);
+    
+    if (!$rekening) return 0;
+    
+    $jenis_mutasi = $rekening['jenis_mutasi'];
+    
+    // Hitung saldo
+    $result = fetchOne("
+        SELECT 
+            COALESCE(SUM(
+                CASE 
+                    WHEN rekening_debet = ? THEN 
+                        CASE WHEN ? = 'Debet' THEN jumlah ELSE -jumlah END
+                    WHEN rekening_kredit = ? THEN 
+                        CASE WHEN ? = 'Kredit' THEN jumlah ELSE -jumlah END
+                    ELSE 0
+                END
+            ), 0) as saldo
+        FROM transaksi
+    ", [$kode_akun, $jenis_mutasi, $kode_akun, $jenis_mutasi]);
+    
+    return $result['saldo'];
+}
+
+/**
+ * HELPER: Cek Saldo Minus (untuk warning)
+ */
+function cekSaldoMinus($kode_akun) {
+    return getSaldoRekening($kode_akun);
+}
+
+/**
+ * HELPER: Get Nama Rekening
+ */
+function getNamaRekening($kode_akun) {
+    $rekening = fetchOne("SELECT nama_akun FROM chart_of_accounts WHERE kode_akun = ?", [$kode_akun]);
+    return $rekening ? $rekening['nama_akun'] : 'Unknown';
+}
+
+/**
+ * HELPER: Generate Keterangan Otomatis
+ */
+function generateKeteranganOtomatis($rekening_debet, $rekening_kredit, $jenis) {
+    $nama_debet = getNamaRekening($rekening_debet);
+    $nama_kredit = getNamaRekening($rekening_kredit);
+    
+    if ($jenis === 'pemasukan') {
+        return "Terima uang dari {$nama_kredit}";
+    } elseif ($jenis === 'pengeluaran') {
+        return "Bayar {$nama_debet}";
+    } elseif ($jenis === 'pemindahan') {
+        return "Transfer dari {$nama_kredit} ke {$nama_debet}";
     }
+    
+    return "Transaksi {$nama_debet} - {$nama_kredit}";
 }
 ?>

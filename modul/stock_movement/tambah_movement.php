@@ -91,14 +91,14 @@ $bahan_list = fetchAll("SELECT * FROM bahan_baku ORDER BY nama_bahan");
                         </div>
 
                         <div class="col-md-12">
-                            <div class="alert alert-warning" id="alertStok" style="display:none;">
+                            <div class="alert alert-hide alert-warning" id="alertStok" style="display:none;">
                                 <i class="bi bi-exclamation-triangle"></i>
                                 <strong>Peringatan:</strong> Jumlah melebihi stok yang tersedia!
                             </div>
                         </div>
 
                         <div class="col-md-12">
-                            <div class="alert alert-danger" id="alertKerugian" style="display:none;">
+                            <div class="alert alert-hide alert-danger" id="alertKerugian" style="display:none;">
                                 <i class="bi bi-x-circle"></i>
                                 <strong>Kerugian:</strong> <span id="nilaiKerugian">Rp 0</span>
                             </div>

@@ -1,418 +1,302 @@
-<?php
+﻿<?php
 /**
- * LAPORAN ARUS KAS (CASH FLOW STATEMENT)
- * Menampilkan arus kas dari saldo awal sampai saldo akhir periode
+ * LAPORAN KAS - Menu Utama
+ * Pilih jenis laporan dan periode
  */
 
-// Default filter
-$tanggal_dari = isset($_GET['tanggal_dari']) ? $_GET['tanggal_dari'] : date('Y-m-01');
-$tanggal_sampai = isset($_GET['tanggal_sampai']) ? $_GET['tanggal_sampai'] : date('Y-m-d');
+// Get range tahun dari transaksi
+$transaksi_awal = fetchOne("SELECT MIN(tgl_transaksi) as tgl_awal FROM transaksi");
+$transaksi_akhir = fetchOne("SELECT MAX(tgl_transaksi) as tgl_akhir FROM transaksi");
 
-// Ambil saldo awal (saldo akhir hari sebelum tanggal_dari)
-$tanggal_sebelum = date('Y-m-d', strtotime($tanggal_dari . ' -1 day'));
-$saldo_awal_data = fetchOne("SELECT saldo_akhir FROM saldo_kas WHERE tanggal <= '$tanggal_sebelum' ORDER BY tanggal DESC LIMIT 1");
-$saldo_awal = $saldo_awal_data ? $saldo_awal_data['saldo_akhir'] : 0;
-
-// Query kas masuk berdasarkan kategori
-$kas_masuk = [];
-$query_masuk = "
-    SELECT 
-        kategori,
-        SUM(nominal) as total
-    FROM kas_umum 
-    WHERE jenis_transaksi = 'masuk' 
-    AND DATE(tanggal_transaksi) BETWEEN '$tanggal_dari' AND '$tanggal_sampai'
-    GROUP BY kategori
-";
-$result_masuk = fetchAll($query_masuk);
-foreach ($result_masuk as $row) {
-    $kas_masuk[$row['kategori']] = $row['total'];
+if ($transaksi_awal && $transaksi_awal['tgl_awal']) {
+    $tahun_awal = date('Y', strtotime($transaksi_awal['tgl_awal']));
+} else {
+    $tahun_awal = date('Y');
 }
 
-// Query kas keluar berdasarkan kategori
-$kas_keluar = [];
-$query_keluar = "
-    SELECT 
-        kategori,
-        SUM(nominal) as total
-    FROM kas_umum 
-    WHERE jenis_transaksi = 'keluar' 
-    AND DATE(tanggal_transaksi) BETWEEN '$tanggal_dari' AND '$tanggal_sampai'
-    GROUP BY kategori
-";
-$result_keluar = fetchAll($query_keluar);
-foreach ($result_keluar as $row) {
-    $kas_keluar[$row['kategori']] = $row['total'];
+if ($transaksi_akhir && $transaksi_akhir['tgl_akhir']) {
+    $tahun_akhir = date('Y', strtotime($transaksi_akhir['tgl_akhir']));
+} else {
+    $tahun_akhir = date('Y');
 }
 
-// Hitung total
-$total_kas_masuk = array_sum($kas_masuk);
-$total_kas_keluar = array_sum($kas_keluar);
-$arus_kas_bersih = $total_kas_masuk - $total_kas_keluar;
-$saldo_akhir = $saldo_awal + $arus_kas_bersih;
-
-// Definisi kategori dan label
-$kategori_masuk = [
-    'penjualan' => 'Penerimaan dari Penjualan',
-    'investasi' => 'Investasi/Modal',
-    'lainnya' => 'Penerimaan Lainnya'
+$bulan_list = [
+    '01' => 'Januari', '02' => 'Februari', '03' => 'Maret',
+    '04' => 'April', '05' => 'Mei', '06' => 'Juni',
+    '07' => 'Juli', '08' => 'Agustus', '09' => 'September',
+    '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
 ];
 
-$kategori_keluar = [
-    'pembelian_bahan' => 'Pembelian Bahan Baku',
-    'gaji' => 'Pembayaran Gaji Karyawan',
-    'operasional' => 'Biaya Operasional',
-    'lainnya' => 'Pengeluaran Lainnya'
-];
-
-// Ambil detail transaksi untuk tabel
-$query_detail = "
-    SELECT 
-        k.*,
-        u.nama_lengkap as nama_user
-    FROM kas_umum k
-    LEFT JOIN users u ON k.user_id = u.id
-    WHERE DATE(k.tanggal_transaksi) BETWEEN '$tanggal_dari' AND '$tanggal_sampai'
-    ORDER BY k.tanggal_transaksi ASC, k.id ASC
-";
-$detail_transaksi = fetchAll($query_detail);
-
-// Hitung saldo berjalan
-$saldo_berjalan = $saldo_awal;
+$bulan_sekarang = date('m');
+$tahun_sekarang = date('Y');
 ?>
 
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="bi bi-graph-up-arrow"></i> Laporan Arus Kas</h2>
-        <button onclick="window.print()" class="btn btn-primary no-print">
-            <i class="bi bi-printer"></i> Cetak Laporan
-        </button>
+<div class="row mb-3">
+    <div class="col-md-12">
+        <h2><i class="bi bi-file-earmark-text"></i> Laporan Keuangan</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="index.php?page=dashboard">Dashboard</a></li>
+                <li class="breadcrumb-item active">Laporan Keuangan</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-filter"></i> Filter Laporan
+            </div>
+            <div class="card-body">
+                <form action="" method="GET" id="formLaporan">
+                    <input type="hidden" name="page" value="laporan_kas">
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label class="form-label">Jenis Laporan *</label>
+                                <select class="form-select form-select-lg" name="jenis_laporan" id="jenisLaporan" required>
+                                    <option value="">-- Pilih Jenis Laporan --</option>
+                                    <option value="neraca">📊 Neraca (Balance Sheet)</option>
+                                    <option value="labarugi">💰 Laba Rugi (Income Statement)</option>
+                                    <option value="aruskas">💸 Arus Kas (Cash Flow)</option>
+                                    <option value="buku_besar">📖 Buku Besar</option>
+                                    <option value="jurnal_umum">📝 Jurnal Umum</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Bulan *</label>
+                                <select class="form-select" name="bulan" id="bulan" required>
+                                    <?php foreach($bulan_list as $key => $value): ?>
+                                    <option value="<?php echo $key; ?>" <?php echo ($key == $bulan_sekarang) ? 'selected' : ''; ?>>
+                                        <?php echo $value; ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Tahun *</label>
+                                <select class="form-select" name="tahun" id="tahun" required>
+                                    <?php for($y = $tahun_awal; $y <= $tahun_akhir; $y++): ?>
+                                    <option value="<?php echo $y; ?>" <?php echo ($y == $tahun_sekarang) ? 'selected' : ''; ?>>
+                                        <?php echo $y; ?>
+                                    </option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12">
+                            <button type="submit" class="btn btn-primary btn-lg" id="btnTampilkan">
+                                <i class="bi bi-eye"></i> Tampilkan Laporan
+                            </button>
+                            <button type="button" class="btn btn-success" id="btnExport" style="display:none;">
+                                <i class="bi bi-file-earmark-excel"></i> Export Excel
+                            </button>
+                            <button type="button" class="btn btn-danger" id="btnPrint" style="display:none;">
+                                <i class="bi bi-printer"></i> Print PDF
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Container Laporan -->
+        <div id="containerLaporan" style="display:none;" class="mt-4">
+            <!-- Laporan akan dimuat di sini -->
+        </div>
     </div>
 
-    <!-- Filter -->
-    <div class="card mb-4 no-print">
-        <div class="card-header">
-            <h5 class="mb-0"><i class="bi bi-calendar-range"></i> Periode Laporan</h5>
-        </div>
-        <div class="card-body">
-            <form method="GET" action="index.php">
-                <input type="hidden" name="page" value="laporan_kas">
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Tanggal Dari</label>
-                        <input type="date" class="form-control" name="tanggal_dari" 
-                               value="<?php echo $tanggal_dari; ?>" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Tanggal Sampai</label>
-                        <input type="date" class="form-control" name="tanggal_sampai" 
-                               value="<?php echo $tanggal_sampai; ?>" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">&nbsp;</label>
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-search"></i> Tampilkan Laporan
-                        </button>
-                    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <i class="bi bi-info-circle"></i> Jenis Laporan
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6><i class="bi bi-diagram-3"></i> Neraca</h6>
+                    <small class="text-muted">
+                        Menampilkan posisi Aset, Liabilitas, dan Ekuitas pada periode tertentu
+                    </small>
                 </div>
-                <div class="row mt-2">
-                    <div class="col-12">
-                        <small class="text-muted">Quick Filter:</small>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDateFilter('today')">Hari Ini</button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDateFilter('week')">7 Hari</button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDateFilter('month')">Bulan Ini</button>
-                    </div>
+                <hr>
+                <div class="mb-3">
+                    <h6><i class="bi bi-cash-stack"></i> Laba Rugi</h6>
+                    <small class="text-muted">
+                        Menampilkan Pendapatan, Beban, dan Laba/Rugi dalam periode tertentu
+                    </small>
                 </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Header Laporan -->
-    <div class="text-center mb-4 print-header">
-        <h3><strong>LAPORAN ARUS KAS</strong></h3>
-        <h5>Periode: <?php echo date('d F Y', strtotime($tanggal_dari)); ?> s/d <?php echo date('d F Y', strtotime($tanggal_sampai)); ?></h5>
-        <hr>
-    </div>
-
-    <!-- Laporan Arus Kas -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <table class="table table-bordered">
-                <tbody>
-                    <!-- Saldo Awal -->
-                    <tr class="table-light">
-                        <td colspan="2"><strong>Saldo Kas Awal (<?php echo date('d/m/Y', strtotime($tanggal_dari)); ?>)</strong></td>
-                        <td class="text-end" width="200"><strong><?php echo formatRupiah($saldo_awal); ?></strong></td>
-                    </tr>
-
-                    <!-- KAS MASUK -->
-                    <tr class="table-success">
-                        <td colspan="3"><strong>ARUS KAS MASUK</strong></td>
-                    </tr>
-                    <?php foreach ($kategori_masuk as $key => $label): ?>
-                    <tr>
-                        <td width="50"></td>
-                        <td><?php echo $label; ?></td>
-                        <td class="text-end"><?php echo formatRupiah($kas_masuk[$key] ?? 0); ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                    <tr class="table-success">
-                        <td colspan="2" class="text-end"><strong>Total Kas Masuk</strong></td>
-                        <td class="text-end"><strong><?php echo formatRupiah($total_kas_masuk); ?></strong></td>
-                    </tr>
-
-                    <!-- KAS KELUAR -->
-                    <tr class="table-danger">
-                        <td colspan="3"><strong>ARUS KAS KELUAR</strong></td>
-                    </tr>
-                    <?php foreach ($kategori_keluar as $key => $label): ?>
-                    <tr>
-                        <td></td>
-                        <td><?php echo $label; ?></td>
-                        <td class="text-end"><?php echo formatRupiah($kas_keluar[$key] ?? 0); ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                    <tr class="table-danger">
-                        <td colspan="2" class="text-end"><strong>Total Kas Keluar</strong></td>
-                        <td class="text-end"><strong><?php echo formatRupiah($total_kas_keluar); ?></strong></td>
-                    </tr>
-
-                    <!-- Arus Kas Bersih -->
-                    <tr class="table-warning">
-                        <td colspan="2" class="text-end"><strong>Arus Kas Bersih (Surplus/Defisit)</strong></td>
-                        <td class="text-end">
-                            <strong class="<?php echo $arus_kas_bersih >= 0 ? 'text-success' : 'text-danger'; ?>">
-                                <?php echo formatRupiah($arus_kas_bersih); ?>
-                            </strong>
-                        </td>
-                    </tr>
-
-                    <!-- Saldo Akhir -->
-                    <tr class="table-primary">
-                        <td colspan="2"><strong>Saldo Kas Akhir (<?php echo date('d/m/Y', strtotime($tanggal_sampai)); ?>)</strong></td>
-                        <td class="text-end">
-                            <strong style="font-size: 1.1em;"><?php echo formatRupiah($saldo_akhir); ?></strong>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Summary Cards -->
-    <div class="row mb-4 no-print">
-        <div class="col-md-3">
-            <div class="card bg-info text-white">
-                <div class="card-body text-center">
-                    <h6>Saldo Awal</h6>
-                    <h4><?php echo formatRupiah($saldo_awal); ?></h4>
+                <hr>
+                <div class="mb-3">
+                    <h6><i class="bi bi-arrow-left-right"></i> Arus Kas</h6>
+                    <small class="text-muted">
+                        Menampilkan aliran kas masuk dan keluar dalam periode tertentu
+                    </small>
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <h6><i class="bi bi-book"></i> Buku Besar</h6>
+                    <small class="text-muted">
+                        Menampilkan mutasi per akun dalam periode tertentu
+                    </small>
+                </div>
+                <hr>
+                <div class="mb-0">
+                    <h6><i class="bi bi-journal-text"></i> Jurnal Umum</h6>
+                    <small class="text-muted">
+                        Menampilkan semua transaksi jurnal dalam periode tertentu
+                    </small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-success text-white">
-                <div class="card-body text-center">
-                    <h6>Total Kas Masuk</h6>
-                    <h4><?php echo formatRupiah($total_kas_masuk); ?></h4>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-danger text-white">
-                <div class="card-body text-center">
-                    <h6>Total Kas Keluar</h6>
-                    <h4><?php echo formatRupiah($total_kas_keluar); ?></h4>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-primary text-white">
-                <div class="card-body text-center">
-                    <h6>Saldo Akhir</h6>
-                    <h4><?php echo formatRupiah($saldo_akhir); ?></h4>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Detail Transaksi -->
-    <div class="card">
-        <div class="card-header">
-            <h5 class="mb-0"><i class="bi bi-list-ul"></i> Detail Transaksi Kas</h5>
-        </div>
-        <div class="card-body">
-            <?php if (empty($detail_transaksi)): ?>
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> Tidak ada transaksi kas pada periode yang dipilih.
+        <div class="card mt-3">
+            <div class="card-header bg-warning">
+                <i class="bi bi-calendar-check"></i> Periode Tersedia
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <small class="text-muted">Data Dari:</small><br>
+                    <strong>
+                        <?php 
+                        if($transaksi_awal && $transaksi_awal['tgl_awal']) {
+                            echo date('F Y', strtotime($transaksi_awal['tgl_awal']));
+                        } else {
+                            echo 'Belum ada data';
+                        }
+                        ?>
+                    </strong>
                 </div>
-            <?php else: ?>
-                <div class="table-responsive">
-                    <table class="table table-hover table-sm">
-                        <thead class="table-light">
-                            <tr>
-                                <th width="5%">No</th>
-                                <th width="10%">Tanggal</th>
-                                <th width="15%">No. Transaksi</th>
-                                <th>Keterangan</th>
-                                <th width="10%" class="text-center">Jenis</th>
-                                <th width="12%" class="text-end">Kas Masuk</th>
-                                <th width="12%" class="text-end">Kas Keluar</th>
-                                <th width="12%" class="text-end">Saldo</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="table-info">
-                                <td colspan="7" class="text-end"><strong>Saldo Awal</strong></td>
-                                <td class="text-end"><strong><?php echo formatRupiah($saldo_berjalan); ?></strong></td>
-                            </tr>
-                            <?php 
-                            $no = 1;
-                            foreach ($detail_transaksi as $kas): 
-                                if ($kas['jenis_transaksi'] == 'masuk') {
-                                    $saldo_berjalan += $kas['nominal'];
-                                } else {
-                                    $saldo_berjalan -= $kas['nominal'];
-                                }
-                            ?>
-                            <tr>
-                                <td><?php echo $no++; ?></td>
-                                <td><?php echo date('d/m/Y', strtotime($kas['tanggal_transaksi'])); ?></td>
-                                <td><small><?php echo $kas['no_transaksi_kas']; ?></small></td>
-                                <td>
-                                    <small>
-                                        <?php 
-                                        $kategori_label = [
-                                            'penjualan' => 'Penjualan',
-                                            'pembelian_bahan' => 'Pembelian Bahan',
-                                            'gaji' => 'Gaji',
-                                            'operasional' => 'Operasional',
-                                            'investasi' => 'Investasi',
-                                            'lainnya' => 'Lainnya'
-                                        ];
-                                        echo '<strong>' . ($kategori_label[$kas['kategori']] ?? $kas['kategori']) . '</strong>';
-                                        echo $kas['keterangan'] ? '<br>' . $kas['keterangan'] : '';
-                                        ?>
-                                    </small>
-                                </td>
-                                <td class="text-center">
-                                    <?php if ($kas['jenis_transaksi'] == 'masuk'): ?>
-                                        <span class="badge bg-success">Masuk</span>
-                                    <?php else: ?>
-                                        <span class="badge bg-danger">Keluar</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="text-end">
-                                    <?php echo $kas['jenis_transaksi'] == 'masuk' ? formatRupiah($kas['nominal']) : '-'; ?>
-                                </td>
-                                <td class="text-end">
-                                    <?php echo $kas['jenis_transaksi'] == 'keluar' ? formatRupiah($kas['nominal']) : '-'; ?>
-                                </td>
-                                <td class="text-end">
-                                    <strong><?php echo formatRupiah($saldo_berjalan); ?></strong>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                            <tr class="table-primary">
-                                <td colspan="5" class="text-end"><strong>TOTAL</strong></td>
-                                <td class="text-end"><strong><?php echo formatRupiah($total_kas_masuk); ?></strong></td>
-                                <td class="text-end"><strong><?php echo formatRupiah($total_kas_keluar); ?></strong></td>
-                                <td class="text-end"><strong><?php echo formatRupiah($saldo_akhir); ?></strong></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="mb-0">
+                    <small class="text-muted">Sampai:</small><br>
+                    <strong>
+                        <?php 
+                        if($transaksi_akhir && $transaksi_akhir['tgl_akhir']) {
+                            echo date('F Y', strtotime($transaksi_akhir['tgl_akhir']));
+                        } else {
+                            echo 'Belum ada data';
+                        }
+                        ?>
+                    </strong>
                 </div>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <!-- Footer Actions -->
-    <div class="card mt-3 no-print">
-        <div class="card-body">
-            <div class="d-flex gap-2">
-                <button onclick="exportToExcel()" class="btn btn-success">
-                    <i class="bi bi-file-earmark-excel"></i> Export Excel
-                </button>
-                <button onclick="exportToPDF()" class="btn btn-danger">
-                    <i class="bi bi-file-earmark-pdf"></i> Export PDF
-                </button>
-                <button onclick="window.print()" class="btn btn-secondary">
-                    <i class="bi bi-printer"></i> Cetak
-                </button>
             </div>
         </div>
     </div>
 </div>
 
+<script>
+document.getElementById('formLaporan').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const jenis = document.getElementById('jenisLaporan').value;
+    const bulan = document.getElementById('bulan').value;
+    const tahun = document.getElementById('tahun').value;
+    
+    if (!jenis) {
+        alert('Pilih jenis laporan terlebih dahulu!');
+        return;
+    }
+    
+    // Show loading
+    const container = document.getElementById('containerLaporan');
+    container.style.display = 'block';
+    container.innerHTML = '<div class="card"><div class="card-body text-center"><i class="bi bi-hourglass-split"></i> Memuat laporan...</div></div>';
+    
+    // Load laporan via AJAX
+    loadLaporan(jenis, bulan, tahun);
+});
+
+async function loadLaporan(jenis, bulan, tahun) {
+    const container = document.getElementById('containerLaporan');
+    
+    try {
+        // Load langsung dari folder modul/laporan/
+        const response = await fetch(`modul/laporan/${jenis}.php?bulan=${bulan}&tahun=${tahun}&ajax=1`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const html = await response.text();
+        
+        // Check if response contains error
+        if (html.includes('404') || html.includes('Not Found')) {
+            throw new Error('Laporan tidak ditemukan. File laporan belum dibuat.');
+        }
+        
+        container.innerHTML = html;
+        
+        // Show export buttons
+        document.getElementById('btnExport').style.display = 'inline-block';
+        document.getElementById('btnPrint').style.display = 'inline-block';
+        
+        // Scroll to laporan
+        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+    } catch (error) {
+        container.innerHTML = `
+            <div class="card">
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> 
+                        <strong>Error:</strong> ${error.message}
+                        <hr>
+                        <small>
+                            <strong>Pastikan file berikut ada:</strong><br>
+                            - modul/laporan/${jenis}.php<br>
+                            <strong>URL yang diakses:</strong><br>
+                            modul/laporan/${jenis}.php?bulan=${bulan}&tahun=${tahun}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Print
+document.getElementById('btnPrint').addEventListener('click', function() {
+    window.print();
+});
+
+// Export (placeholder)
+document.getElementById('btnExport').addEventListener('click', function() {
+    alert('Fitur export Excel akan segera hadir!');
+});
+
+// Keyboard shortcut
+document.addEventListener('keydown', function(e) {
+    // Ctrl/Cmd + P untuk print
+    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        const container = document.getElementById('containerLaporan');
+        if (container.style.display === 'block') {
+            e.preventDefault();
+            window.print();
+        }
+    }
+});
+</script>
+
 <style>
 @media print {
-    .no-print {
+    .card-header, .breadcrumb, nav, form, .btn, .col-md-4 {
         display: none !important;
     }
-    
-    .card {
-        border: 1px solid #ddd !important;
-        box-shadow: none !important;
-        page-break-inside: avoid;
+    .col-md-8 {
+        width: 100% !important;
     }
-    
-    .table {
-        font-size: 11px;
+    #containerLaporan {
+        margin: 0 !important;
+        padding: 0 !important;
     }
-    
-    .print-header {
-        margin-bottom: 20px;
-    }
-    
-    @page {
-        size: A4;
-        margin: 15mm;
-    }
-    
-    body {
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
-    }
-}
-
-.table-bordered td, .table-bordered th {
-    border: 1px solid #dee2e6;
-}
-
-.card-body table tr td {
-    padding: 0.5rem;
 }
 </style>
-
-<script>
-function exportToExcel() {
-    alert('Fitur Export Excel akan segera tersedia');
-}
-
-function exportToPDF() {
-    alert('Fitur Export PDF akan segera tersedia');
-}
-
-function setDateFilter(type) {
-    const today = new Date();
-    let dateFrom, dateTo;
-    
-    switch(type) {
-        case 'today':
-            dateFrom = dateTo = today.toISOString().split('T')[0];
-            break;
-        case 'week':
-            const weekAgo = new Date(today);
-            weekAgo.setDate(weekAgo.getDate() - 7);
-            dateFrom = weekAgo.toISOString().split('T')[0];
-            dateTo = today.toISOString().split('T')[0];
-            break;
-        case 'month':
-            dateFrom = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-            dateTo = today.toISOString().split('T')[0];
-            break;
-    }
-    
-    document.querySelector('input[name="tanggal_dari"]').value = dateFrom;
-    document.querySelector('input[name="tanggal_sampai"]').value = dateTo;
-}
-</script>

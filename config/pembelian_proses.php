@@ -1,7 +1,7 @@
 <?php
 /**
- * PROSES PEMBELIAN BAHAN + WEIGHTED AVERAGE (Harga Total)
- * Step 17/64 (26.6%)
+ * PROSES PEMBELIAN BAHAN + WEIGHTED AVERAGE + JURNAL COA
+ * Modified: Menggunakan tabel transaksi dengan COA
  */
 
 session_start();
@@ -26,7 +26,7 @@ switch ($action) {
 }
 
 /**
- * CREATE - Proses Pembelian Bahan dengan Weighted Average
+ * CREATE - Proses Pembelian Bahan dengan Weighted Average + Jurnal COA
  */
 function createPembelian() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -36,9 +36,10 @@ function createPembelian() {
     
     $bahan_id = intval($_POST['bahan_id']);
     $jumlah_beli = floatval($_POST['jumlah_beli']);
-    $total_harga_beli = floatval($_POST['total_harga_beli']); // UBAH: input total harga
+    $total_harga_beli = floatval($_POST['total_harga_beli']);
     $supplier = trim($_POST['supplier']);
     $tanggal_beli = $_POST['tanggal_beli'];
+    $metode_bayar = isset($_POST['metode_bayar']) ? $_POST['metode_bayar'] : 'tunai'; // tunai/bank/utang
     
     // Validasi
     if ($bahan_id == 0 || $jumlah_beli <= 0 || $total_harga_beli <= 0 || empty($tanggal_beli)) {
@@ -58,12 +59,35 @@ function createPembelian() {
         exit;
     }
     
-    // Cek saldo kas cukup
-    $saldo_kas = getSaldoKasTerakhir();
-    if ($saldo_kas < $total_harga_beli) {
-        $_SESSION['error'] = 'Saldo kas tidak cukup! Saldo: ' . formatRupiah($saldo_kas) . ', Dibutuhkan: ' . formatRupiah($total_harga_beli);
-        header('Location: ../index.php?page=pembelian_bahan');
-        exit;
+    // Tentukan akun kredit berdasarkan metode bayar
+    $akun_kredit = '';
+    $keterangan_metode = '';
+    switch ($metode_bayar) {
+        case 'tunai':
+            $akun_kredit = '1.1.01.01'; // Kas Tunai
+            $keterangan_metode = 'Tunai';
+            break;
+        case 'bank':
+            $akun_kredit = '1.1.02.01'; // Bank Mandiri
+            $keterangan_metode = 'Transfer Bank';
+            break;
+        case 'utang':
+            $akun_kredit = '2.1.01.01'; // Utang Supplier
+            $keterangan_metode = 'Utang';
+            break;
+        default:
+            $akun_kredit = '1.1.01.01';
+            $keterangan_metode = 'Tunai';
+    }
+    
+    // Jika bayar tunai/bank, cek saldo
+    if ($metode_bayar != 'utang') {
+        $saldo = getSaldoAkun($akun_kredit);
+        if ($saldo < $total_harga_beli) {
+            $_SESSION['error'] = 'Saldo tidak cukup! Saldo: ' . formatRupiah($saldo) . ', Dibutuhkan: ' . formatRupiah($total_harga_beli);
+            header('Location: ../index.php?page=pembelian_bahan');
+            exit;
+        }
     }
     
     // START TRANSACTION
@@ -92,7 +116,7 @@ function createPembelian() {
         $harga_lama = $bahan['harga_beli_per_satuan'];
         
         $nilai_lama = $stok_lama * $harga_lama;
-        $nilai_baru = $total_harga_beli; // langsung pakai total harga
+        $nilai_baru = $total_harga_beli;
         $total_nilai = $nilai_lama + $nilai_baru;
         $total_stok = $stok_lama + $jumlah_beli;
         
@@ -119,38 +143,41 @@ function createPembelian() {
             stok_sebelum, stok_sesudah, referensi_type, referensi_id, keterangan, user_id) 
             VALUES (?, 'masuk', ?, ?, ?, ?, ?, ?, 'pembelian', ?, ?, ?)";
         
-        $keterangan = "Pembelian dari " . ($supplier ?: 'Supplier');
+        $keterangan_movement = "Pembelian dari " . ($supplier ?: 'Supplier');
         $result_movement = execute($sql_movement, [
             $bahan_id, $jumlah_beli, $bahan['satuan'], $harga_beli_satuan, $total_harga_beli,
-            $stok_lama, $total_stok, $pembelian_id, $keterangan, $_SESSION['user_id']
+            $stok_lama, $total_stok, $pembelian_id, $keterangan_movement, $_SESSION['user_id']
         ]);
         
         if (!$result_movement['success']) {
             throw new Exception('Gagal catat stock movement');
         }
         
-        // 5. Catat kas keluar OTOMATIS
-        $no_kas = generateNoKas();
-        $saldo_sebelum = $saldo_kas;
-        $saldo_sesudah = $saldo_sebelum - $total_harga_beli;
+        // 5. JURNAL: Catat transaksi ke tabel transaksi (menggunakan COA)
+        // Debet: Persediaan Bahan Baku (1.2.01.00)
+        // Kredit: Kas/Bank/Utang (tergantung metode bayar)
         
-        $sql_kas = "INSERT INTO kas_umum 
-            (no_transaksi_kas, tanggal_transaksi, jenis_transaksi, kategori, nominal, 
-            saldo_sebelum, saldo_sesudah, referensi_type, referensi_id, keterangan, user_id) 
-            VALUES (?, NOW(), 'keluar', 'pembelian_bahan', ?, ?, ?, 'pembelian', ?, ?, ?)";
+        $keterangan_jurnal = "Pembelian " . $bahan['nama_bahan'] . " (" . 
+                            number_format($jumlah_beli, 2) . " " . $bahan['satuan'] . ") - " . 
+                            $keterangan_metode . 
+                            ($supplier ? " dari " . $supplier : "");
         
-        $keterangan_kas = "Pembelian " . $bahan['nama_bahan'] . " (" . $jumlah_beli . " " . $bahan['satuan'] . ")";
-        $result_kas = execute($sql_kas, [
-            $no_kas, $total_harga_beli, $saldo_sebelum, $saldo_sesudah, 
-            $pembelian_id, $keterangan_kas, $_SESSION['user_id']
+        $sql_transaksi = "INSERT INTO transaksi 
+            (tgl_transaksi, rekening_debet, rekening_kredit, keterangan_transaksi, jumlah, id_user, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, NOW())";
+        
+        $result_transaksi = execute($sql_transaksi, [
+            $tanggal_beli,
+            '1.2.01.00',  // Debet: Persediaan Bahan Baku
+            $akun_kredit,  // Kredit: Kas/Bank/Utang
+            $keterangan_jurnal,
+            $total_harga_beli,
+            $_SESSION['user_id']
         ]);
         
-        if (!$result_kas['success']) {
-            throw new Exception('Gagal catat kas');
+        if (!$result_transaksi['success']) {
+            throw new Exception('Gagal catat jurnal transaksi');
         }
-        
-        // 6. Update saldo_kas harian
-        updateSaldoKasHarian('keluar', $total_harga_beli);
         
         // COMMIT
         $conn->commit();
@@ -170,55 +197,30 @@ function createPembelian() {
 }
 
 /**
- * Helper: Get Saldo Kas Terakhir
+ * Helper: Get Saldo Akun dari Transaksi
  */
-function getSaldoKasTerakhir() {
-    $result = fetchOne("SELECT saldo_sesudah FROM kas_umum ORDER BY created_at DESC, id DESC LIMIT 1");
-    return $result ? $result['saldo_sesudah'] : 0;
-}
-
-/**
- * Helper: Update Saldo Kas Harian
- */
-function updateSaldoKasHarian($jenis, $nominal) {
-    $today = date('Y-m-d');
+function getSaldoAkun($kode_akun) {
+    // Cek jenis mutasi akun
+    $akun = fetchOne("SELECT jenis_mutasi FROM chart_of_accounts WHERE kode_akun = ?", [$kode_akun]);
+    if (!$akun) return 0;
     
-    // Cek apakah sudah ada record hari ini
-    $cek = fetchOne("SELECT * FROM saldo_kas WHERE tanggal = ?", [$today]);
+    $jenis_mutasi = $akun['jenis_mutasi'];
     
-    if ($cek) {
-        // Update existing
-        if ($jenis == 'masuk') {
-            $sql = "UPDATE saldo_kas 
-                    SET total_masuk = total_masuk + ?, 
-                        saldo_akhir = saldo_akhir + ? 
-                    WHERE tanggal = ?";
-        } else {
-            $sql = "UPDATE saldo_kas 
-                    SET total_keluar = total_keluar + ?, 
-                        saldo_akhir = saldo_akhir - ? 
-                    WHERE tanggal = ?";
-        }
-        execute($sql, [$nominal, $nominal, $today]);
+    // Hitung saldo berdasarkan jenis mutasi
+    if ($jenis_mutasi == 'Debet') {
+        // Saldo = Total Debet - Total Kredit
+        $total_debet = fetchOne("SELECT COALESCE(SUM(jumlah), 0) as total FROM transaksi WHERE rekening_debet = ?", [$kode_akun]);
+        $total_kredit = fetchOne("SELECT COALESCE(SUM(jumlah), 0) as total FROM transaksi WHERE rekening_kredit = ?", [$kode_akun]);
+        
+        $saldo = $total_debet['total'] - $total_kredit['total'];
     } else {
-        // Insert new - ambil saldo akhir kemarin
-        $kemarin = date('Y-m-d', strtotime('-1 day'));
-        $saldo_kemarin = fetchOne("SELECT saldo_akhir FROM saldo_kas WHERE tanggal = ? ORDER BY tanggal DESC LIMIT 1", [$kemarin]);
-        $saldo_awal = $saldo_kemarin ? $saldo_kemarin['saldo_akhir'] : getSaldoKasTerakhir();
+        // Kredit: Saldo = Total Kredit - Total Debet
+        $total_kredit = fetchOne("SELECT COALESCE(SUM(jumlah), 0) as total FROM transaksi WHERE rekening_kredit = ?", [$kode_akun]);
+        $total_debet = fetchOne("SELECT COALESCE(SUM(jumlah), 0) as total FROM transaksi WHERE rekening_debet = ?", [$kode_akun]);
         
-        if ($jenis == 'masuk') {
-            $total_masuk = $nominal;
-            $total_keluar = 0;
-            $saldo_akhir = $saldo_awal + $nominal;
-        } else {
-            $total_masuk = 0;
-            $total_keluar = $nominal;
-            $saldo_akhir = $saldo_awal - $nominal;
-        }
-        
-        $sql = "INSERT INTO saldo_kas (tanggal, saldo_awal, total_masuk, total_keluar, saldo_akhir) 
-                VALUES (?, ?, ?, ?, ?)";
-        execute($sql, [$today, $saldo_awal, $total_masuk, $total_keluar, $saldo_akhir]);
+        $saldo = $total_kredit['total'] - $total_debet['total'];
     }
+    
+    return $saldo;
 }
 ?>

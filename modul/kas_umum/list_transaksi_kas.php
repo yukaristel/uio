@@ -1,268 +1,235 @@
 ﻿<?php
 /**
- * DAFTAR TRANSAKSI KAS
- * Step 33/64 (51.6%)
+ * LIST TRANSAKSI
+ * Dengan fitur Jurnal Pembalik
  */
 
+// Pagination
+$limit = 50;
+$page = isset($_GET['hal']) ? intval($_GET['hal']) : 1;
+$offset = ($page - 1) * $limit;
+
 // Filter
-$tanggal_dari = isset($_GET['tanggal_dari']) ? $_GET['tanggal_dari'] : date('Y-m-01');
-$tanggal_sampai = isset($_GET['tanggal_sampai']) ? $_GET['tanggal_sampai'] : date('Y-m-d');
-$jenis = isset($_GET['jenis']) ? $_GET['jenis'] : '';
-$kategori = isset($_GET['kategori']) ? $_GET['kategori'] : '';
+$filter_tanggal_dari = isset($_GET['dari']) ? $_GET['dari'] : date('Y-m-01');
+$filter_tanggal_sampai = isset($_GET['sampai']) ? $_GET['sampai'] : date('Y-m-d');
+$filter_akun = isset($_GET['akun']) ? $_GET['akun'] : '';
 
-// Build query
-$where = "DATE(tanggal_transaksi) BETWEEN ? AND ?";
-$params = [$tanggal_dari, $tanggal_sampai];
+// Query
+$where = "WHERE tgl_transaksi BETWEEN ? AND ?";
+$params = [$filter_tanggal_dari, $filter_tanggal_sampai];
 
-if (!empty($jenis)) {
-    $where .= " AND jenis_transaksi = ?";
-    $params[] = $jenis;
+if (!empty($filter_akun)) {
+    $where .= " AND (rekening_debet = ? OR rekening_kredit = ?)";
+    $params[] = $filter_akun;
+    $params[] = $filter_akun;
 }
 
-if (!empty($kategori)) {
-    $where .= " AND kategori = ?";
-    $params[] = $kategori;
-}
-
-// Get transaksi kas
-$transaksi_list = fetchAll("
-    SELECT k.*, u.nama_lengkap 
-    FROM kas_umum k
-    JOIN users u ON k.user_id = u.id
-    WHERE $where
-    ORDER BY k.tanggal_transaksi DESC, k.id DESC
+// Get data
+$transaksi = fetchAll("
+    SELECT t.*, 
+           d.nama_akun as nama_debet, 
+           k.nama_akun as nama_kredit
+    FROM transaksi t
+    LEFT JOIN chart_of_accounts d ON t.rekening_debet = d.kode_akun
+    LEFT JOIN chart_of_accounts k ON t.rekening_kredit = k.kode_akun
+    {$where}
+    ORDER BY t.tgl_transaksi DESC, t.id DESC
+    LIMIT {$limit} OFFSET {$offset}
 ", $params);
 
-// Summary
-$summary = fetchOne("
-    SELECT 
-        COUNT(*) as total_transaksi,
-        COALESCE(SUM(CASE WHEN jenis_transaksi = 'masuk' THEN nominal ELSE 0 END), 0) as total_masuk,
-        COALESCE(SUM(CASE WHEN jenis_transaksi = 'keluar' THEN nominal ELSE 0 END), 0) as total_keluar
-    FROM kas_umum
-    WHERE $where
-", $params);
+// Total
+$total = fetchOne("SELECT COUNT(*) as total FROM transaksi {$where}", $params);
+$total_rows = $total['total'];
+$total_pages = ceil($total_rows / $limit);
 
-$selisih = $summary['total_masuk'] - $summary['total_keluar'];
+// Get COA untuk filter
+$coa_all = fetchAll("
+    SELECT kode_akun, nama_akun 
+    FROM chart_of_accounts 
+    WHERE lev4 > 0
+    ORDER BY kode_akun
+");
 ?>
 
 <div class="row mb-3">
     <div class="col-md-12">
-        <h2><i class="bi bi-list-check"></i> Daftar Transaksi Kas</h2>
+        <h2><i class="bi bi-journal-text"></i> Daftar Transaksi</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="index.php?page=dashboard">Dashboard</a></li>
+                <li class="breadcrumb-item active">Daftar Transaksi</li>
+            </ol>
+        </nav>
     </div>
 </div>
 
-<!-- Summary Cards -->
-<div class="row mb-3">
-    <div class="col-md-3">
-        <div class="card dashboard-card card-primary">
-            <div class="card-body">
-                <div>
-                    <h6 class="text-muted">Total Transaksi</h6>
-                    <h3 class="mb-0"><?php echo $summary['total_transaksi']; ?></h3>
-                </div>
-                <div class="icon">
-                    <i class="bi bi-list-check text-primary"></i>
-                </div>
+<!-- Filter -->
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="GET" action="index.php" class="row g-3">
+            <input type="hidden" name="page" value="list_transaksi">
+            
+            <div class="col-md-3">
+                <label class="form-label">Dari Tanggal</label>
+                <input type="date" class="form-control" name="dari" 
+                       value="<?php echo $filter_tanggal_dari; ?>">
             </div>
-        </div>
+            
+            <div class="col-md-3">
+                <label class="form-label">Sampai Tanggal</label>
+                <input type="date" class="form-control" name="sampai" 
+                       value="<?php echo $filter_tanggal_sampai; ?>">
+            </div>
+            
+            <div class="col-md-4">
+                <label class="form-label">Filter Akun</label>
+                <select class="form-select" name="akun">
+                    <option value="">-- Semua Akun --</option>
+                    <?php foreach($coa_all as $coa): ?>
+                    <option value="<?php echo $coa['kode_akun']; ?>" 
+                            <?php echo ($filter_akun == $coa['kode_akun']) ? 'selected' : ''; ?>>
+                        <?php echo $coa['kode_akun']; ?> - <?php echo $coa['nama_akun']; ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-filter"></i> Filter
+                </button>
+            </div>
+        </form>
     </div>
+</div>
 
-    <div class="col-md-3">
-        <div class="card dashboard-card card-success">
-            <div class="card-body">
-                <div>
-                    <h6 class="text-muted">Total Pemasukan</h6>
-                    <h4 class="mb-0 text-success"><?php echo formatRupiah($summary['total_masuk']); ?></h4>
-                </div>
-                <div class="icon">
-                    <i class="bi bi-arrow-down-circle text-success"></i>
-                </div>
-            </div>
+<!-- Actions -->
+<div class="mb-3">
+    <a href="index.php?page=tambah_transaksi" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Tambah Transaksi
+    </a>
+    <a href="index.php?page=list_transaksi" class="btn btn-secondary">
+        <i class="bi bi-arrow-clockwise"></i> Reset Filter
+    </a>
+</div>
+
+<!-- Table -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th width="5%">No</th>
+                        <th width="10%">Tanggal</th>
+                        <th width="15%">Debet</th>
+                        <th width="15%">Kredit</th>
+                        <th width="30%">Keterangan</th>
+                        <th width="12%" class="text-end">Jumlah</th>
+                        <th width="13%" class="text-center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($transaksi)): ?>
+                    <tr>
+                        <td colspan="7" class="text-center">Tidak ada data transaksi</td>
+                    </tr>
+                    <?php else: ?>
+                        <?php 
+                        $no = $offset + 1;
+                        foreach($transaksi as $t): 
+                        ?>
+                        <tr>
+                            <td><?php echo $no++; ?></td>
+                            <td><?php echo date('d/m/Y', strtotime($t['tgl_transaksi'])); ?></td>
+                            <td>
+                                <small class="text-muted"><?php echo $t['rekening_debet']; ?></small><br>
+                                <?php echo $t['nama_debet']; ?>
+                            </td>
+                            <td>
+                                <small class="text-muted"><?php echo $t['rekening_kredit']; ?></small><br>
+                                <?php echo $t['nama_kredit']; ?>
+                            </td>
+                            <td>
+                                <?php 
+                                // Highlight jika jurnal pembalik
+                                if (strpos($t['keterangan_transaksi'], '[PEMBALIK]') !== false) {
+                                    echo '<span class="badge bg-warning text-dark">PEMBALIK</span> ';
+                                }
+                                if (strpos($t['keterangan_transaksi'], '[SUDAH DIBALIK') !== false) {
+                                    echo '<span class="badge bg-secondary">DIBALIK</span> ';
+                                }
+                                echo htmlspecialchars($t['keterangan_transaksi']); 
+                                ?>
+                            </td>
+                            <td class="text-end">
+                                <strong><?php echo formatRupiah($t['jumlah']); ?></strong>
+                            </td>
+                            <td class="text-center">
+                                <!-- Tombol Jurnal Pembalik -->
+                                <?php if (strpos($t['keterangan_transaksi'], '[SUDAH DIBALIK') === false): ?>
+                                <a href="config/kas_proses.php?action=reverse&id=<?php echo $t['id']; ?>" 
+                                   class="btn btn-warning btn-sm" 
+                                   onclick="return confirm('Buat jurnal pembalik untuk transaksi ini?\n\nIni akan membuat transaksi kebalikan untuk membatalkan transaksi yang salah.');"
+                                   title="Jurnal Pembalik">
+                                    <i class="bi bi-arrow-left-right"></i>
+                                </a>
+                                <?php else: ?>
+                                <button class="btn btn-secondary btn-sm" disabled title="Sudah dibalik">
+                                    <i class="bi bi-check-circle"></i>
+                                </button>
+                                <?php endif; ?>
+                                
+                                <!-- Tombol Hapus -->
+                                <a href="config/kas_proses.php?action=delete&id=<?php echo $t['id']; ?>" 
+                                   class="btn btn-danger btn-sm" 
+                                   onclick="return confirm('Yakin hapus transaksi ini?\n\nPeringatan: Penghapusan akan mempengaruhi saldo!');"
+                                   title="Hapus">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="card dashboard-card card-danger">
-            <div class="card-body">
-                <div>
-                    <h6 class="text-muted">Total Pengeluaran</h6>
-                    <h4 class="mb-0 text-danger"><?php echo formatRupiah($summary['total_keluar']); ?></h4>
-                </div>
-                <div class="icon">
-                    <i class="bi bi-arrow-up-circle text-danger"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="card dashboard-card card-info">
-            <div class="card-body">
-                <div>
-                    <h6 class="text-muted">Selisih</h6>
-                    <h4 class="mb-0 <?php echo $selisih >= 0 ? 'text-success' : 'text-danger'; ?>">
-                        <?php echo formatRupiah($selisih); ?>
-                    </h4>
-                </div>
-                <div class="icon">
-                    <i class="bi bi-graph-up-arrow text-info"></i>
-                </div>
-            </div>
+        
+        <!-- Pagination -->
+        <?php if ($total_pages > 1): ?>
+        <nav>
+            <ul class="pagination justify-content-center">
+                <?php for($i = 1; $i <= $total_pages; $i++): ?>
+                <li class="page-item <?php echo ($page == $i) ? 'active' : ''; ?>">
+                    <a class="page-link" href="?page=list_transaksi&hal=<?php echo $i; ?>&dari=<?php echo $filter_tanggal_dari; ?>&sampai=<?php echo $filter_tanggal_sampai; ?>&akun=<?php echo $filter_akun; ?>">
+                        <?php echo $i; ?>
+                    </a>
+                </li>
+                <?php endfor; ?>
+            </ul>
+        </nav>
+        <?php endif; ?>
+        
+        <!-- Info -->
+        <div class="text-center text-muted mt-3">
+            <small>
+                Menampilkan <?php echo $offset + 1; ?> - <?php echo min($offset + $limit, $total_rows); ?> 
+                dari <?php echo $total_rows; ?> transaksi
+            </small>
         </div>
     </div>
 </div>
 
-<!-- Filter & Action -->
-<div class="row mb-3">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-body">
-                <form method="GET" action="" class="row g-3">
-                    <input type="hidden" name="page" value="list_transaksi_kas">
-                    
-                    <div class="col-md-2">
-                        <label class="form-label">Tanggal Dari</label>
-                        <input type="date" class="form-control" name="tanggal_dari" 
-                               value="<?php echo $tanggal_dari; ?>">
-                    </div>
-                    
-                    <div class="col-md-2">
-                        <label class="form-label">Tanggal Sampai</label>
-                        <input type="date" class="form-control" name="tanggal_sampai" 
-                               value="<?php echo $tanggal_sampai; ?>">
-                    </div>
-                    
-                    <div class="col-md-2">
-                        <label class="form-label">Jenis</label>
-                        <select class="form-select" name="jenis">
-                            <option value="">Semua</option>
-                            <option value="masuk" <?php echo $jenis == 'masuk' ? 'selected' : ''; ?>>Pemasukan</option>
-                            <option value="keluar" <?php echo $jenis == 'keluar' ? 'selected' : ''; ?>>Pengeluaran</option>
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label">Kategori</label>
-                        <select class="form-select" name="kategori">
-                            <option value="">Semua</option>
-                            <option value="penjualan" <?php echo $kategori == 'penjualan' ? 'selected' : ''; ?>>Penjualan</option>
-                            <option value="pembelian_bahan" <?php echo $kategori == 'pembelian_bahan' ? 'selected' : ''; ?>>Pembelian Bahan</option>
-                            <option value="gaji" <?php echo $kategori == 'gaji' ? 'selected' : ''; ?>>Gaji</option>
-                            <option value="operasional" <?php echo $kategori == 'operasional' ? 'selected' : ''; ?>>Operasional</option>
-                            <option value="investasi" <?php echo $kategori == 'investasi' ? 'selected' : ''; ?>>Investasi</option>
-                            <option value="lainnya" <?php echo $kategori == 'lainnya' ? 'selected' : ''; ?>>Lainnya</option>
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label">&nbsp;</label>
-                        <div>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-search"></i> Filter
-                            </button>
-                            <a href="index.php?page=list_transaksi_kas" class="btn btn-secondary">
-                                <i class="bi bi-arrow-counterclockwise"></i> Reset
-                            </a>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Tabel Transaksi -->
-<div class="row">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-list-ul"></i> Daftar Transaksi Kas</span>
-                <a href="index.php?page=tambah_transaksi_kas" class="btn btn-primary btn-sm">
-                    <i class="bi bi-plus-circle"></i> Transaksi Baru
-                </a>
-            </div>
-            <div class="card-body">
-                <?php if (empty($transaksi_list)): ?>
-                    <div class="text-center text-muted py-5">
-                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-                        <p class="mt-3">Tidak ada transaksi pada periode ini</p>
-                    </div>
-                <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover">
-                            <thead>
-                                <tr>
-                                    <th>No. Transaksi</th>
-                                    <th>Tanggal</th>
-                                    <th>Jenis</th>
-                                    <th>Kategori</th>
-                                    <th>Nominal</th>
-                                    <th>Saldo</th>
-                                    <th>Keterangan</th>
-                                    <th>User</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($transaksi_list as $trx): ?>
-                                <tr>
-                                    <td>
-                                        <strong><?php echo $trx['no_transaksi_kas']; ?></strong>
-                                        <?php if ($trx['referensi_type']): ?>
-                                            <br><small class="text-muted">
-                                                Ref: <?php echo ucfirst($trx['referensi_type']); ?>
-                                            </small>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?php echo formatDateTime($trx['tanggal_transaksi'], 'd/m/Y H:i'); ?></td>
-                                    <td>
-                                        <?php if ($trx['jenis_transaksi'] == 'masuk'): ?>
-                                            <span class="badge bg-success">
-                                                <i class="bi bi-arrow-down-circle"></i> Masuk
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="badge bg-danger">
-                                                <i class="bi bi-arrow-up-circle"></i> Keluar
-                                            </span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <small><?php echo ucwords(str_replace('_', ' ', $trx['kategori'])); ?></small>
-                                    </td>
-                                    <td class="<?php echo $trx['jenis_transaksi'] == 'masuk' ? 'text-success' : 'text-danger'; ?>">
-                                        <strong><?php echo formatRupiah($trx['nominal']); ?></strong>
-                                    </td>
-                                    <td>
-                                        <small class="text-muted">
-                                            <?php echo formatRupiah($trx['saldo_sebelum']); ?> 
-                                            → 
-                                            <strong><?php echo formatRupiah($trx['saldo_sesudah']); ?></strong>
-                                        </small>
-                                    </td>
-                                    <td>
-                                        <small><?php echo htmlspecialchars(substr($trx['keterangan'], 0, 50)); ?></small>
-                                        <?php if (strlen($trx['keterangan']) > 50): ?>
-                                            ...
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><small><?php echo $trx['nama_lengkap']; ?></small></td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                            <tfoot>
-                                <tr class="table-secondary">
-                                    <th colspan="4" class="text-end">TOTAL:</th>
-                                    <th>
-                                        <span class="text-success">▼ <?php echo formatRupiah($summary['total_masuk']); ?></span><br>
-                                        <span class="text-danger">▲ <?php echo formatRupiah($summary['total_keluar']); ?></span>
-                                    </th>
-                                    <th colspan="3"></th>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
+<!-- Legend -->
+<div class="card mt-3">
+    <div class="card-body">
+        <h6><i class="bi bi-info-circle"></i> Keterangan:</h6>
+        <ul class="mb-0">
+            <li><span class="badge bg-warning text-dark">PEMBALIK</span> = Jurnal pembalik (untuk koreksi transaksi yang salah)</li>
+            <li><span class="badge bg-secondary">DIBALIK</span> = Transaksi sudah dibuat pembaliknya</li>
+            <li><i class="bi bi-arrow-left-right text-warning"></i> = Tombol untuk membuat jurnal pembalik</li>
+            <li><i class="bi bi-trash text-danger"></i> = Tombol untuk hapus transaksi</li>
+        </ul>
     </div>
 </div>

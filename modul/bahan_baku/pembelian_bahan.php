@@ -40,7 +40,7 @@ $bahan_id_selected = isset($_GET['bahan_id']) ? intval($_GET['bahan_id']) : 0;
             <div class="card-body">
                 <form action="config/pembelian_proses.php?action=create" method="POST" id="formPembelian">
                     <div class="row">
-                        <div class="col-md-12">
+                        <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label">Pilih Bahan *</label>
                                 <select class="form-select" name="bahan_id" id="bahanSelect" required>
@@ -68,6 +68,16 @@ $bahan_id_selected = isset($_GET['bahan_id']) ? intval($_GET['bahan_id']) : 0;
                             </div>
                         </div>
 
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Tanggal Beli *</label>
+                                <input type="date" class="form-control" name="tanggal_beli" 
+                                       value="<?php echo date('Y-m-d'); ?>" required>
+                            </div>
+                        </div>
+
+
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label">Jumlah Beli *</label>
@@ -76,6 +86,7 @@ $bahan_id_selected = isset($_GET['bahan_id']) ? intval($_GET['bahan_id']) : 0;
                                 <small class="text-muted">Satuan: <span id="satuanJumlah">-</span></small>
                             </div>
                         </div>
+                        
 
                         <div class="col-md-6">
                             <div class="mb-3">
@@ -93,17 +104,21 @@ $bahan_id_selected = isset($_GET['bahan_id']) ? intval($_GET['bahan_id']) : 0;
                                        placeholder="Nama supplier (opsional)">
                             </div>
                         </div>
-
+                        
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="form-label">Tanggal Beli *</label>
-                                <input type="date" class="form-control" name="tanggal_beli" 
-                                       value="<?php echo date('Y-m-d'); ?>" required>
+                                <label class="form-label">Metode Pembayaran</label>
+                                <select name="metode_pembayaran" class="form-select">
+                                    <option value="tunai">Tunai</option>
+                                    <option value="transfer">Transfer Bank</option>
+                                    <option value="qris">QRIS</option>
+                                    <option value="utang">Utang Supplier</option>
+                                </select>
                             </div>
                         </div>
 
                         <div class="col-md-12">
-                            <div class="alert alert-warning" id="alertSaldo" style="display:none;">
+                            <div class="alert alert-hide alert-warning" id="alertSaldo" style="display:none;">
                                 <i class="bi bi-exclamation-triangle"></i> 
                                 <strong>Peringatan:</strong> Total pembelian melebihi saldo kas!
                             </div>

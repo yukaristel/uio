@@ -60,7 +60,7 @@ $user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'karyawan';
         }
         
         // Content area
-        echo '<div id="content" class="container-fluid mt-4">';
+        echo '<div id="content" class="container-fluid mt-4 flex-fill">';
         include 'modul/layouts/content.php';
         echo '</div>';
         
@@ -81,7 +81,7 @@ $user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'karyawan';
     <script>
         // Auto hide alert after 5 seconds
         setTimeout(function() {
-            const alerts = document.querySelectorAll('.alert');
+            const alerts = document.querySelectorAll('.alert-hide');
             alerts.forEach(alert => {
                 const bsAlert = new bootstrap.Alert(alert);
                 bsAlert.close();

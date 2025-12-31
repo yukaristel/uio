@@ -163,7 +163,7 @@
 
                 <!-- ALERT ERROR -->
                 <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger alert-dismissible fade show">
+                    <div class="alert alert-hide alert-danger alert-dismissible fade show">
                         <i class="bi bi-exclamation-triangle-fill"></i>
                         <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -172,7 +172,7 @@
 
                 <!-- ALERT SUCCESS -->
                 <?php if (isset($_SESSION['success'])): ?>
-                    <div class="alert alert-success alert-dismissible fade show">
+                    <div class="alert alert-hide alert-success alert-dismissible fade show">
                         <i class="bi bi-check-circle-fill"></i>
                         <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>

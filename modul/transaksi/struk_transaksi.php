@@ -1,7 +1,7 @@
 ﻿<?php
 /**
  * STRUK TRANSAKSI (PRINT)
- * Step 28/64 (43.8%)
+ * UPDATED: Support untuk menampilkan diskon/biaya admin non-tunai
  */
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
@@ -29,6 +29,16 @@ $items = fetchAll("
     JOIN menu_makanan m ON dt.menu_id = m.id 
     WHERE dt.transaksi_id = ?
 ", [$id]);
+
+// HITUNG SELISIH UNTUK NON-TUNAI
+$selisih = $transaksi['total_harga'] - $transaksi['uang_bayar'];
+$ada_selisih = ($transaksi['metode_pembayaran'] != 'tunai' && $selisih != 0);
+
+// Hitung persentase
+$persentase_selisih = 0;
+if ($ada_selisih && $transaksi['total_harga'] > 0) {
+    $persentase_selisih = ($selisih / $transaksi['total_harga']) * 100;
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -124,6 +134,23 @@ $items = fetchAll("
             margin-top: 5px;
         }
         
+        .summary-row.discount {
+            color: #d00;
+        }
+        
+        .summary-row.fee {
+            color: #c70;
+        }
+        
+        .payment-method {
+            text-align: center;
+            margin-top: 10px;
+            padding: 8px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            font-weight: bold;
+        }
+        
         .footer {
             text-align: center;
             border-top: 1px dashed #000;
@@ -144,6 +171,13 @@ $items = fetchAll("
             .struk {
                 border: none;
             }
+            
+            .payment-method {
+                background: none;
+                border: none;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
         }
     </style>
 </head>
@@ -152,7 +186,8 @@ $items = fetchAll("
         <button onclick="window.print()" style="padding: 10px 20px; font-size: 14px; cursor: pointer;">
             🖨️ CETAK STRUK
         </button>
-        <button onclick="window.close()" style="padding: 10px 20px; font-size: 14px; cursor: pointer; margin-left: 10px;">
+        <button onclick="window.location.href='?page=buat_transaksi'" 
+                style="padding: 10px 20px; font-size: 14px; cursor: pointer; margin-left: 10px;">
             ❌ TUTUP
         </button>
     </div>
@@ -207,20 +242,44 @@ $items = fetchAll("
                 <span><?php echo formatRupiah($transaksi['total_harga']); ?></span>
             </div>
             
+            <?php if ($ada_selisih): ?>
+                <?php if ($selisih > 0): ?>
+                    <!-- ADA POTONGAN/DISKON -->
+                    <div class="summary-row discount">
+                        <span>Diskon (<?php echo number_format($persentase_selisih, 2); ?>%)</span>
+                        <span>-<?php echo formatRupiah($selisih); ?></span>
+                    </div>
+                <?php else: ?>
+                    <!-- ADA BIAYA ADMIN/PAJAK -->
+                    <div class="summary-row fee">
+                        <span>Pajak & Admin (<?php echo number_format(abs($persentase_selisih), 2); ?>%)</span>
+                        <span><?php echo formatRupiah(abs($selisih)); ?></span>
+                    </div>
+                <?php endif; ?>
+            <?php endif; ?>
+            
             <div class="summary-row total">
-                <span>TOTAL</span>
-                <span><?php echo formatRupiah($transaksi['total_harga']); ?></span>
+                <span>TOTAL BAYAR</span>
+                <span><?php echo formatRupiah($transaksi['uang_bayar']); ?></span>
             </div>
             
             <?php if ($transaksi['metode_pembayaran'] == 'tunai'): ?>
-            <div class="summary-row">
-                <span>Uang Bayar</span>
-                <span><?php echo formatRupiah($transaksi['uang_bayar']); ?></span>
-            </div>
-            <div class="summary-row">
-                <span>Kembali</span>
-                <span><?php echo formatRupiah($transaksi['uang_kembali']); ?></span>
-            </div>
+                <!-- KHUSUS TUNAI: TAMPILKAN UANG BAYAR & KEMBALIAN -->
+                <div class="summary-row">
+                    <span>Uang Bayar</span>
+                    <span><?php echo formatRupiah($transaksi['uang_bayar']); ?></span>
+                </div>
+                <div class="summary-row">
+                    <span>Kembali</span>
+                    <span><?php echo formatRupiah($transaksi['uang_kembali']); ?></span>
+                </div>
+            <?php else: ?>
+                <!-- KHUSUS NON-TUNAI: TAMPILKAN METODE PEMBAYARAN -->
+                <div class="payment-method">
+                    Dibayar via <?php echo strtoupper($transaksi['metode_pembayaran']); ?>
+                    <br>
+                    <?php echo formatRupiah($transaksi['uang_bayar']); ?>
+                </div>
             <?php endif; ?>
         </div>
 

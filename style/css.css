@@ -31,6 +31,7 @@ html {
 
 .main-container {
     padding: 20px;
+    flex: 1;
 }
 
 /* ============================================
@@ -241,6 +242,7 @@ footer {
     background-color: var(--primary-color);
     color: white;
     padding: 20px 0;
+    margin-top: auto;
 }
 
 /* ============================================
@@ -250,4 +252,8 @@ footer {
     .dashboard-card .icon {
         font-size: 2rem;
     }
+}
+
+#content {
+    flex: 1;
 }

@@ -197,7 +197,7 @@ $total_opname = $total_opname_result ? intval($total_opname_result['total']) : 0
                     <h4 class="text-success"><?php echo $total_opname; ?></h4>
                 </div>
                 <?php if ($total_transaksi > 0 || $total_opname > 0): ?>
-                <div class="alert alert-warning mb-0">
+                <div class="alert alert-hide alert-warning mb-0">
                     <small>
                         <i class="bi bi-info-circle"></i> 
                         Karyawan ini memiliki history aktivitas. 

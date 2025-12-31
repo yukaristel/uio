@@ -236,7 +236,7 @@ $menu_terlaris = fetchAll("
                             <p class="mb-0">Semua stok bahan aman</p>
                         </div>
                     <?php else: ?>
-                        <div class="alert alert-warning">
+                        <div class="alert alert-hide alert-warning">
                             <i class="bi bi-info-circle"></i> 
                             <strong>Perhatian!</strong> Beberapa bahan stok menipis. Segera hubungi admin untuk pembelian.
                         </div>

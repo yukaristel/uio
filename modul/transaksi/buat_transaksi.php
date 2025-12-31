@@ -1,9 +1,7 @@
 ﻿<?php
 /**
  * FORM BUAT TRANSAKSI PENJUALAN - MODERN TOUCH UI + GRATIS SPLIT
- * Step 25/64 (39.1%)
- * FITUR: Gratis dengan split item
- * Optimized for touchscreen
+ * POS System dengan input uang diterima untuk GoPay/Grab
  */
 
 // Ambil daftar menu yang tersedia
@@ -196,26 +194,36 @@ foreach ($menu_list as $menu) {
                             </div>
 
                             <div class="row g-3 mb-3">
-                                <!-- LEFT: Summary -->
+                                <!-- LEFT: Metode -->
                                 <div class="col-6">
                                     <div class="mb-3">
                                         <label class="form-label">Metode Pembayaran</label>
                                         <select class="form-select" name="metode_pembayaran" id="metodePembayaran" required>
                                             <option value="tunai">💵 Tunai</option>
                                             <option value="qris">📱 QRIS</option>
+                                            <option value="gopay">🟢 GoPay</option>
                                             <option value="grab">🟢 Grab</option>
-                                            <option value="gojek">🟢 GoJek</option>
                                         </select>
                                     </div>
                                 </div>
                                 
-                                <!-- RIGHT: Payment Form -->
+                                <!-- RIGHT: Input -->
                                 <div class="col-6">
+                                    <!-- Input untuk TUNAI -->
                                     <div id="formUangBayarInput">
                                         <div class="mb-3">
                                             <label class="form-label">Uang Bayar</label>
                                             <input type="text" class="form-control text-end" 
                                                    name="uang_bayar" id="uangBayar" placeholder="0" readonly>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Input untuk GOPAY/GRAB/QRIS -->
+                                    <div id="formUangTerimaInput" style="display: none;">
+                                        <div class="mb-3">
+                                            <label class="form-label">Uang Diterima <small class="text-muted">(setelah fee)</small></label>
+                                            <input type="text" class="form-control text-end" 
+                                                   name="uang_terima" id="uangTerima" placeholder="0" readonly>
                                         </div>
                                     </div>
                                 </div>
@@ -273,11 +281,9 @@ foreach ($menu_list as $menu) {
                                 </div>
                             </div>
 
-                            <button type="submit" class=" mt-3 btn btn-success w-100" id="btnProses">
-                                        <i class="bi bi-check-circle"></i> PROSES TRANSAKSI
-                                    </button>
-                                </div>
-                            </div>
+                            <button type="submit" class="mt-3 btn btn-success w-100" id="btnProses">
+                                <i class="bi bi-check-circle"></i> PROSES TRANSAKSI
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -717,11 +723,13 @@ document.addEventListener('DOMContentLoaded', function() {
     let cart = {};
     let cartIdCounter = 0;
     let uangBayarValue = "";
+    let uangTerimaValue = "";
     let currentView = 'grid';
 
     const metodePembayaran = document.getElementById('metodePembayaran');
     const formUangBayar = document.getElementById('formUangBayar');
     const uangBayarInput = document.getElementById('uangBayar');
+    const uangTerimaInput = document.getElementById('uangTerima');
     const btnProses = document.getElementById('btnProses');
     const cartItemsContainer = document.getElementById('cartItems');
     const menuContainer = document.getElementById('menuContainer');
@@ -906,7 +914,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('potonganInfo2').style.display = 'none';
             }
 
-            if (uangBayarValue) updateUangBayar();
+            if (uangBayarValue || uangTerimaValue) updateUangBayar();
         }
     }
 
@@ -941,7 +949,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (item.is_gratis) {
             // Jika item gratis diklik → gabung ke item normal
-            // Cari item normal dengan menu_id yang sama
             let foundNormal = false;
             for (let cId in cart) {
                 if (cId !== cartId && cart[cId].menu_id === item.menu_id && !cart[cId].is_gratis) {
@@ -952,17 +959,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
-            // Jika tidak ada item normal, ubah item ini jadi normal
             if (!foundNormal) {
                 item.is_gratis = false;
             }
         } else {
             // Jika item normal diklik → split 1 qty jadi gratis
             if (item.qty > 1) {
-                // Kurangi qty item ini
                 item.qty--;
                 
-                // Buat item gratis baru dengan qty 1
                 const newCartId = 'cart_' + (++cartIdCounter);
                 cart[newCartId] = {
                     cart_id: newCartId,
@@ -973,7 +977,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     is_gratis: true
                 };
             } else {
-                // Jika qty = 1, langsung ubah jadi gratis
                 item.is_gratis = true;
             }
         }
@@ -985,15 +988,28 @@ document.addEventListener('DOMContentLoaded', function() {
     // PAYMENT METHOD
     // =================================
     metodePembayaran.addEventListener('change', function() {
-        if (this.value === 'tunai') {
+        const metode = this.value;
+        
+        if (metode === 'tunai') {
+            // Tunai: tampilkan numpad untuk uang bayar
             formUangBayar.style.display = 'block';
             document.getElementById('formUangBayarInput').style.display = 'block';
+            document.getElementById('formUangTerimaInput').style.display = 'none';
+            document.getElementById('displayKembaliMini').style.display = 'block';
             uangBayarInput.required = true;
         } else {
-            formUangBayar.style.display = 'none';
+            // GoPay/Grab/QRIS: tampilkan numpad untuk uang diterima
+            formUangBayar.style.display = 'block';
             document.getElementById('formUangBayarInput').style.display = 'none';
+            document.getElementById('formUangTerimaInput').style.display = 'block';
+            document.getElementById('displayKembaliMini').style.display = 'none';
             uangBayarInput.required = false;
         }
+        
+        // Reset input
+        uangBayarValue = "";
+        uangTerimaValue = "";
+        updateUangBayar();
     });
 
     // =================================
@@ -1002,44 +1018,78 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.numpad-btn, .btn-quick').forEach(btn => {
         btn.addEventListener('click', function() {
             const value = this.dataset.value;
+            const metode = metodePembayaran.value;
 
             if (value === 'clear') {
-                uangBayarValue = "";
+                if (metode === 'tunai') {
+                    uangBayarValue = "";
+                } else {
+                    uangTerimaValue = "";
+                }
                 updateUangBayar();
                 return;
             }
 
             if (value === 'backspace') {
-                uangBayarValue = uangBayarValue.slice(0, -1);
+                if (metode === 'tunai') {
+                    uangBayarValue = uangBayarValue.slice(0, -1);
+                } else {
+                    uangTerimaValue = uangTerimaValue.slice(0, -1);
+                }
                 updateUangBayar();
                 return;
             }
 
             if (value === 'exact') {
-                uangBayarValue = String(getTotalHarga());
+                const totalHarga = getTotalHarga();
+                if (metode === 'tunai') {
+                    uangBayarValue = String(totalHarga);
+                } else {
+                    uangTerimaValue = String(totalHarga);
+                }
                 updateUangBayar();
                 return;
             }
 
-            uangBayarValue += value;
-            uangBayarValue = uangBayarValue.replace(/^0+(\d)/, "$1");
+            // Tambah digit
+            if (metode === 'tunai') {
+                uangBayarValue += value;
+                uangBayarValue = uangBayarValue.replace(/^0+(\d)/, "$1");
+            } else {
+                uangTerimaValue += value;
+                uangTerimaValue = uangTerimaValue.replace(/^0+(\d)/, "$1");
+            }
             updateUangBayar();
         });
     });
 
     function updateUangBayar() {
-        const numberValue = parseInt(uangBayarValue || "0");
-        uangBayarInput.value = formatRupiahInput(numberValue);
-
+        const metode = metodePembayaran.value;
         const totalHarga = getTotalHarga();
-        const kembali = numberValue - totalHarga;
-        
-        document.getElementById('uangKembaliMini').textContent = formatRupiah(kembali);
 
-        if (kembali >= 0 && numberValue > 0) {
-            btnProses.disabled = false;
+        if (metode === 'tunai') {
+            // TUNAI: Validasi uang bayar >= total
+            const numberValue = parseInt(uangBayarValue || "0");
+            uangBayarInput.value = formatRupiahInput(numberValue);
+
+            const kembali = numberValue - totalHarga;
+            document.getElementById('uangKembaliMini').textContent = formatRupiah(kembali);
+
+            if (kembali >= 0 && numberValue > 0) {
+                btnProses.disabled = false;
+            } else {
+                btnProses.disabled = true;
+            }
         } else {
-            btnProses.disabled = numberValue === 0 && metodePembayaran.value === 'tunai';
+            // GOPAY/GRAB/QRIS: Input uang yang diterima (bebas)
+            const numberValue = parseInt(uangTerimaValue || "0");
+            uangTerimaInput.value = formatRupiahInput(numberValue);
+
+            if (numberValue > 0) {
+                btnProses.disabled = false;
+            } else {
+                btnProses.disabled = true;
+            }
         }
     }
 
@@ -1057,13 +1107,22 @@ document.addEventListener('DOMContentLoaded', function() {
         const totalHarga = getTotalHarga();
         const metode = metodePembayaran.value;
 
-        if (metode === 'tunai' && parseInt(uangBayarValue || "0") < totalHarga) {
-            alert('Uang bayar kurang! Total: ' + formatRupiah(totalHarga));
-            return false;
+        // Validasi sesuai metode
+        if (metode === 'tunai') {
+            const uangBayar = parseInt(uangBayarValue || "0");
+            if (uangBayar < totalHarga) {
+                alert('Uang bayar kurang! Total: ' + formatRupiah(totalHarga));
+                return false;
+            }
+        } else {
+            const uangTerima = parseInt(uangTerimaValue || "0");
+            if (uangTerima <= 0) {
+                alert('Masukkan jumlah uang yang diterima!');
+                return false;
+            }
         }
 
         // GROUP cart by menu_id untuk POST
-        // Gabungkan semua item dengan menu_id sama (gratis + normal)
         const groupedCart = {};
         for (let cartId in cart) {
             const item = cart[cartId];
@@ -1084,14 +1143,12 @@ document.addEventListener('DOMContentLoaded', function() {
         for (let menuId in groupedCart) {
             const data = groupedCart[menuId];
             
-            // Input menu_id
             const inputMenuId = document.createElement('input');
             inputMenuId.type = 'hidden';
             inputMenuId.name = 'menu_id[]';
             inputMenuId.value = data.menu_id;
             this.appendChild(inputMenuId);
 
-            // Input jumlah (qty yang dibayar saja)
             const inputJumlah = document.createElement('input');
             inputJumlah.type = 'hidden';
             inputJumlah.name = 'jumlah[]';
@@ -1099,13 +1156,24 @@ document.addEventListener('DOMContentLoaded', function() {
             this.appendChild(inputJumlah);
         }
 
+        // Hidden input untuk uang bayar/terima
         const hiddenInput = document.createElement('input');
         hiddenInput.type = 'hidden';
         hiddenInput.name = 'uang_bayar_value';
-        hiddenInput.value = uangBayarValue;
+        
+        if (metode === 'tunai') {
+            hiddenInput.value = uangBayarValue;
+        } else {
+            // Untuk GoPay/Grab/QRIS, kirim uang yang diterima
+            hiddenInput.value = uangTerimaValue;
+        }
         this.appendChild(hiddenInput);
 
-        if (confirm('Proses transaksi sebesar ' + formatRupiah(totalHarga) + '?')) {
+        const pesanKonfirmasi = metode === 'tunai' 
+            ? 'Proses transaksi sebesar ' + formatRupiah(totalHarga) + '?'
+            : 'Proses transaksi sebesar ' + formatRupiah(totalHarga) + '?\nUang diterima: ' + formatRupiah(parseInt(uangTerimaValue || "0"));
+
+        if (confirm(pesanKonfirmasi)) {
             this.submit();
         }
     });

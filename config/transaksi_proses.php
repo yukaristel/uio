@@ -1,7 +1,6 @@
 <?php
 /**
- * PROSES TRANSAKSI PENJUALAN + STOCK MOVEMENT + KAS OTOMATIS
- * Step 20/64 (31.3%) - PART 1
+ * PROSES TRANSAKSI PENJUALAN + STOCK MOVEMENT + JURNAL AKUNTANSI OTOMATIS
  * 
  * FLOW:
  * 1. Validasi stok bahan mencukupi
@@ -9,8 +8,8 @@
  * 3. Insert detail_transaksi
  * 4. Update stok bahan (kurangi stok)
  * 5. Catat stock_movement (keluar)
- * 6. Catat kas_umum (masuk)
- * 7. Update saldo_kas harian
+ * 6. Catat jurnal akuntansi (penjualan + HPP) - OTOMATIS
+ * 7. Generate saldo dari transaksi
  */
 
 session_start();
@@ -112,10 +111,16 @@ function createTransaksi() {
         
         $total_keuntungan = $total_harga - $total_modal;
         
-        // Validasi uang bayar (jika tunai)
+        // Validasi uang bayar
         if ($metode_pembayaran == 'tunai') {
+            // TUNAI: Harus >= total
             if ($uang_bayar < $total_harga) {
                 throw new Exception('Uang bayar kurang! Total: ' . formatRupiah($total_harga));
+            }
+        } else {
+            // NON-TUNAI: Minimal harus ada input
+            if ($uang_bayar <= 0) {
+                throw new Exception('Masukkan nominal uang yang diterima!');
             }
         }
         
@@ -162,28 +167,11 @@ function createTransaksi() {
             kurangiStokBahan($transaksi_id, $item['menu_id'], $item['jumlah']);
         }
         
-        // 5. Catat kas masuk OTOMATIS
-        $no_kas = generateNoKas();
-        $saldo_sebelum = getSaldoKasTerakhir();
-        $saldo_sesudah = $saldo_sebelum + $total_harga;
-        
-        $sql_kas = "INSERT INTO kas_umum 
-            (no_transaksi_kas, tanggal_transaksi, jenis_transaksi, kategori, nominal, 
-            saldo_sebelum, saldo_sesudah, referensi_type, referensi_id, keterangan, user_id) 
-            VALUES (?, NOW(), 'masuk', 'penjualan', ?, ?, ?, 'penjualan', ?, ?, ?)";
-        
-        $keterangan_kas = "Penjualan - $no_transaksi";
-        $result_kas = execute($sql_kas, [
-            $no_kas, $total_harga, $saldo_sebelum, $saldo_sesudah,
-            $transaksi_id, $keterangan_kas, $_SESSION['user_id']
-        ]);
-        
-        if (!$result_kas['success']) {
-            throw new Exception('Gagal catat kas!');
-        }
-        
-        // 6. Update saldo_kas harian
-        updateSaldoKasHarian('masuk', $total_harga);
+        // 5. Catat jurnal akuntansi OTOMATIS (PENGGANTI kas_umum)
+        // TUNAI: pakai total_harga (karena ada kembalian)
+        // NON-TUNAI: pakai uang_bayar (karena bisa ada potongan/diskon)
+        $jumlah_pendapatan = ($metode_pembayaran == 'tunai') ? $total_harga : $uang_bayar;
+        catatJurnalAkuntansi($transaksi_id, $no_transaksi, $metode_pembayaran, $jumlah_pendapatan, $total_modal);
         
         // COMMIT TRANSACTION
         $conn->commit();
@@ -244,11 +232,6 @@ function cekStokBahan($menu_id, $jumlah_porsi) {
 }
 
 /**
- * TRANSAKSI PROSES - PART 2 (Helper Functions)
- * Step 21/64 (32.8%)
- */
-
-/**
  * KURANGI STOK BAHAN + CATAT STOCK MOVEMENT
  */
 function kurangiStokBahan($transaksi_id, $menu_id, $jumlah_porsi) {
@@ -293,12 +276,8 @@ function kurangiStokBahan($transaksi_id, $menu_id, $jumlah_porsi) {
         
         // Catat stock movement
         $total_nilai = $jumlah_pakai * $bahan['harga_beli_per_satuan'];
-        
-        // PERBAIKAN: Pastikan satuan tidak NULL dan valid
-        // Gunakan satuan dari bahan_baku (yang pasti ada karena NOT NULL di database)
         $satuan_movement = $bahan['satuan_bahan'];
         
-        // Double check: jika masih kosong (seharusnya tidak mungkin)
         if (empty($satuan_movement)) {
             throw new Exception("Satuan bahan '{$bahan['nama_bahan']}' tidak valid!");
         }
@@ -313,7 +292,7 @@ function kurangiStokBahan($transaksi_id, $menu_id, $jumlah_porsi) {
         $result_movement = execute($sql_movement, [
             $bahan['bahan_id'], 
             $jumlah_pakai, 
-            $satuan_movement, // Menggunakan satuan dari bahan_baku
+            $satuan_movement,
             $bahan['harga_beli_per_satuan'], 
             $total_nilai,
             $stok_sebelum, 
@@ -330,70 +309,61 @@ function kurangiStokBahan($transaksi_id, $menu_id, $jumlah_porsi) {
 }
 
 /**
- * GET SALDO KAS TERAKHIR
+ * CATAT JURNAL AKUNTANSI (PENGGANTI kas_umum)
+ * Otomatis insert ke tabel transaksi untuk laporan keuangan
+ * 
+ * PARAMETER ke-4 ($jumlah_pendapatan):
+ * - TUNAI: Menggunakan total_harga (karena ada kembalian, pendapatan = harga menu)
+ * - NON-TUNAI: Menggunakan uang_bayar (karena pendapatan = uang yang diterima)
  */
-function getSaldoKasTerakhir() {
-    $result = fetchOne("SELECT saldo_sesudah FROM kas_umum ORDER BY created_at DESC, id DESC LIMIT 1");
+function catatJurnalAkuntansi($transaksi_id, $no_transaksi, $metode_pembayaran, $jumlah_pendapatan, $total_modal) {
+    // 1. Tentukan akun kas berdasarkan metode pembayaran
+    $akun_kas = [
+        'tunai' => '1.1.01.01',  // Kas Tunai
+        'qris'  => '1.1.01.02',  // Kas QRIS
+        'gopay' => '1.1.01.03',  // Kas GoPay
+        'grab'  => '1.1.01.04'   // Kas Grab
+    ];
     
-    if (!$result) {
-        // Jika belum ada transaksi kas, return 0
-        return 0;
+    $rekening_kas = isset($akun_kas[$metode_pembayaran]) ? $akun_kas[$metode_pembayaran] : '1.1.01.01';
+    
+    // 2. Jurnal Penjualan (Kas Masuk)
+    // TUNAI: Pendapatan = total_harga (karena uang bayar bisa lebih, ada kembalian)
+    // NON-TUNAI: Pendapatan = uang yang diterima (karena bisa berbeda dari total)
+    $sql_penjualan = "INSERT INTO transaksi 
+        (tgl_transaksi, rekening_debet, rekening_kredit, keterangan_transaksi, jumlah, id_user)
+        VALUES (NOW(), ?, '4.1.01.01', ?, ?, ?)";
+    
+    $keterangan_penjualan = "Penjualan $no_transaksi - pembayaran " . strtoupper($metode_pembayaran);
+    
+    $result_penjualan = execute($sql_penjualan, [
+        $rekening_kas,
+        $keterangan_penjualan,
+        $jumlah_pendapatan,  // TUNAI: total_harga | NON-TUNAI: uang_bayar
+        $_SESSION['user_id']
+    ]);
+    
+    if (!$result_penjualan['success']) {
+        throw new Exception('Gagal catat jurnal penjualan!');
     }
     
-    return $result['saldo_sesudah'];
-}
-
-/**
- * UPDATE SALDO KAS HARIAN
- */
-function updateSaldoKasHarian($jenis, $nominal) {
-    $today = date('Y-m-d');
+    // 3. Jurnal HPP (Harga Pokok Penjualan)
+    $sql_hpp = "INSERT INTO transaksi 
+        (tgl_transaksi, rekening_debet, rekening_kredit, keterangan_transaksi, jumlah, id_user)
+        VALUES (NOW(), '5.1.01.01', '1.2.01.00', ?, ?, ?)";
     
-    // Cek apakah sudah ada record hari ini
-    $cek = fetchOne("SELECT * FROM saldo_kas WHERE tanggal = ?", [$today]);
+    $keterangan_hpp = "HPP untuk penjualan $no_transaksi";
     
-    if ($cek) {
-        // Update existing
-        if ($jenis == 'masuk') {
-            $sql = "UPDATE saldo_kas 
-                    SET total_masuk = total_masuk + ?, 
-                        saldo_akhir = saldo_akhir + ? 
-                    WHERE tanggal = ?";
-        } else {
-            $sql = "UPDATE saldo_kas 
-                    SET total_keluar = total_keluar + ?, 
-                        saldo_akhir = saldo_akhir - ? 
-                    WHERE tanggal = ?";
-        }
-        execute($sql, [$nominal, $nominal, $today]);
-    } else {
-        // Insert new - ambil saldo akhir kemarin
-        $kemarin = date('Y-m-d', strtotime('-1 day'));
-        $saldo_kemarin = fetchOne("SELECT saldo_akhir FROM saldo_kas WHERE tanggal <= ? ORDER BY tanggal DESC LIMIT 1", [$kemarin]);
-        
-        if (!$saldo_kemarin) {
-            // Jika tidak ada data kemarin, ambil dari kas_umum
-            $saldo_awal = getSaldoKasTerakhir();
-            if ($jenis == 'masuk') {
-                $saldo_awal = $saldo_awal - $nominal; // Karena nominal ini akan ditambahkan
-            }
-        } else {
-            $saldo_awal = $saldo_kemarin['saldo_akhir'];
-        }
-        
-        if ($jenis == 'masuk') {
-            $total_masuk = $nominal;
-            $total_keluar = 0;
-            $saldo_akhir = $saldo_awal + $nominal;
-        } else {
-            $total_masuk = 0;
-            $total_keluar = $nominal;
-            $saldo_akhir = $saldo_awal - $nominal;
-        }
-        
-        $sql = "INSERT INTO saldo_kas (tanggal, saldo_awal, total_masuk, total_keluar, saldo_akhir) 
-                VALUES (?, ?, ?, ?, ?)";
-        execute($sql, [$today, $saldo_awal, $total_masuk, $total_keluar, $saldo_akhir]);
+    $result_hpp = execute($sql_hpp, [
+        $keterangan_hpp,
+        $total_modal,
+        $_SESSION['user_id']
+    ]);
+    
+    if (!$result_hpp['success']) {
+        throw new Exception('Gagal catat jurnal HPP!');
     }
+    
+    return true;
 }
 ?>
