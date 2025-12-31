@@ -1,6 +1,6 @@
 /**
  * CUSTOM CSS - APLIKASI RUMAH MAKAN
- * PASTEL PALETTE (Light Sea Green PRIMARY) + COLLAPSIBLE SIDEBAR
+ * PASTEL PALETTE (Light Sea Green PRIMARY) + COLLAPSIBLE SIDEBAR LIKE CLAUDE
  */
 
 /* ============================================
@@ -52,37 +52,6 @@ body {
     padding: 20px;
     flex: 1;
 }
-
-/* ============================================
-   SIDEBAR TOGGLE BUTTON
-   ============================================ */
-.sidebar-toggle {
-    position: fixed;
-    top: 15px;
-    left: 15px;
-    z-index: 1100;
-    background: var(--sidebar-bg);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all var(--transition-speed) ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-    .sidebar-toggle:hover {
-        background: var(--sidebar-hover);
-        transform: scale(1.05);
-    }
-
-    .sidebar-toggle i {
-        font-size: 20px;
-    }
 
 /* ============================================
    SIDEBAR MAIN
@@ -150,6 +119,10 @@ body {
 .sidebar-header {
     padding: 20px 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
 }
 
 .sidebar-brand {
@@ -165,6 +138,66 @@ body {
     .sidebar-brand i {
         font-size: 24px;
         min-width: 24px;
+    }
+
+/* Toggle Button kecil di pojok kanan sidebar header */
+.sidebar-toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--sidebar-text);
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+    .sidebar-toggle-btn:hover {
+        background: var(--sidebar-hover);
+        color: white;
+    }
+
+    .sidebar-toggle-btn i {
+        font-size: 18px;
+    }
+
+/* Ketika collapsed, sembunyikan toggle button */
+.sidebar.collapsed .sidebar-toggle-btn {
+    display: none;
+}
+
+/* Tambahkan tab kecil yang muncul saat collapsed */
+.sidebar.collapsed::before {
+    content: "\F285"; /* Bootstrap icon: bi-chevron-right */
+    font-family: "bootstrap-icons";
+    position: absolute;
+    top: 20px;
+    right: -40px;
+    width: 32px;
+    height: 32px;
+    background: var(--sidebar-bg);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0 6px 6px 0;
+    cursor: pointer;
+    font-size: 16px;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
+    z-index: 1001;
+}
+
+/* Click area untuk expand ketika collapsed */
+.sidebar.collapsed {
+    cursor: pointer;
+}
+
+    .sidebar.collapsed:hover::before {
+        background: var(--sidebar-hover);
     }
 
 /* ============================================
@@ -572,11 +605,6 @@ footer {
         margin-left: 0;
         width: 100%;
     }
-
-    .sidebar-toggle {
-        left: auto;
-        right: 15px;
-    }
 }
 
 /* ============================================
@@ -584,7 +612,7 @@ footer {
    ============================================ */
 @media print {
     .sidebar,
-    .sidebar-toggle,
+    .sidebar-toggle-btn,
     header,
     footer {
         display: none !important;

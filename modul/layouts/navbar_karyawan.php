@@ -6,11 +6,6 @@
 $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
 ?>
 
-<!-- Toggle Button (Floating) -->
-<button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
-    <i class="bi bi-list"></i>
-</button>
-
 <!-- Sidebar -->
 <nav class="sidebar" id="sidebar">
     <div class="sidebar-header">
@@ -18,6 +13,10 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
             <i class="bi bi-shop"></i>
             <span class="sidebar-text">Rumah Makan</span>
         </div>
+        <!-- Toggle Button di pojok kanan header -->
+        <button class="sidebar-toggle-btn" id="sidebarToggle" title="Toggle Sidebar">
+            <i class="bi bi-layout-sidebar-inset-reverse"></i>
+        </button>
     </div>
 
     <div class="sidebar-menu">
@@ -146,25 +145,44 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
 </nav>
 
 <script>
-// Toggle Sidebar
-document.getElementById('sidebarToggle').addEventListener('click', function() {
+// Tunggu sampai DOM fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle Sidebar
+    const toggleBtn = document.querySelector('.sidebar-toggle-btn');
     const sidebar = document.getElementById('sidebar');
     const mainContent = document.querySelector('.main-content');
-    
-    sidebar.classList.toggle('collapsed');
-    mainContent.classList.toggle('expanded');
-    
-    // Simpan state di localStorage
-    const isCollapsed = sidebar.classList.contains('collapsed');
-    localStorage.setItem('sidebarCollapsed', isCollapsed);
-});
 
-// Load saved state
-window.addEventListener('DOMContentLoaded', function() {
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent sidebar click event
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
+            
+            // Simpan state di localStorage
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            localStorage.setItem('sidebarCollapsed', isCollapsed);
+        });
+    }
+
+    // Click sidebar saat collapsed untuk expand
+    if (sidebar) {
+        sidebar.addEventListener('click', function(e) {
+            if (this.classList.contains('collapsed')) {
+                // Jangan expand jika klik menu item
+                if (!e.target.closest('.sidebar-item') && !e.target.closest('.sidebar-subitem')) {
+                    this.classList.remove('collapsed');
+                    mainContent.classList.remove('expanded');
+                    localStorage.setItem('sidebarCollapsed', false);
+                }
+            }
+        });
+    }
+
+    // Load saved state
     const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-    if (isCollapsed) {
-        document.getElementById('sidebar').classList.add('collapsed');
-        document.querySelector('.main-content').classList.add('expanded');
+    if (isCollapsed && sidebar && mainContent) {
+        sidebar.classList.add('collapsed');
+        mainContent.classList.add('expanded');
     }
 });
 
@@ -173,12 +191,15 @@ function toggleDropdown(event, id) {
     event.preventDefault();
     const submenu = document.getElementById(id);
     const sidebar = document.getElementById('sidebar');
+    const mainContent = document.querySelector('.main-content');
     const parentItem = event.currentTarget;
     
     // Jika sidebar collapsed, buka dulu sidebar
-    if (sidebar.classList.contains('collapsed')) {
+    if (sidebar && sidebar.classList.contains('collapsed')) {
         sidebar.classList.remove('collapsed');
-        document.querySelector('.main-content').classList.remove('expanded');
+        if (mainContent) {
+            mainContent.classList.remove('expanded');
+        }
         localStorage.setItem('sidebarCollapsed', false);
     }
     
