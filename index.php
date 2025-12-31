@@ -1,7 +1,7 @@
 ﻿<?php
 /**
  * APLIKASI RUMAH MAKAN - INDEX.PHP
- * File utama untuk routing aplikasi
+ * File utama untuk routing aplikasi dengan Sidebar Collapsible
  * Step 1/64 (1.6%)
  */
 
@@ -49,22 +49,28 @@ $user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'karyawan';
 <body>
     <?php
     if ($is_logged_in) {
-        // Jika sudah login, tampilkan layout lengkap
-        include 'modul/layouts/header.php';
-        
-        // Pilih navbar sesuai role
+        // Tampilkan sidebar berdasarkan role
         if ($user_role == 'admin') {
             include 'modul/layouts/navbar.php';
         } else {
             include 'modul/layouts/navbar_karyawan.php';
         }
         
+        // Main content wrapper
+        echo '<div class="main-content">';
+        
+        // Header dengan alerts
+        include 'modul/layouts/header.php';
+        
         // Content area
-        echo '<div id="content" class="container-fluid mt-4 flex-fill">';
+        echo '<div id="content" class="container-fluid">';
         include 'modul/layouts/content.php';
         echo '</div>';
         
+        // Footer
         include 'modul/layouts/footer.php';
+        
+        echo '</div>'; // End main-content
     } else {
         // Jika belum login, tampilkan halaman login
         include 'modul/auth/login.php';
@@ -111,18 +117,15 @@ $user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'karyawan';
         function printPage() {
             window.print();
         }
+
+        // Smooth scroll to content (optional, bisa dihapus jika tidak perlu)
+        window.onload = function() {
+            const target = document.getElementById('content'); 
+            if (target) {
+                // Tidak perlu scroll karena content sudah visible
+                console.log("Content loaded");
+            }
+        }
     </script>
-
-    <script>
-window.onload = function() {
-    const target = document.getElementById('content'); 
-    if (target) {
-        target.scrollIntoView({ behavior: 'smooth' });
-    } else {
-        console.warn("Elemen #content tidak ditemukan");
-    }
-}
-</script>
-
 </body>
 </html>

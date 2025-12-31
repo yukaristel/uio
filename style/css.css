@@ -1,32 +1,51 @@
 /**
  * CUSTOM CSS - APLIKASI RUMAH MAKAN
- * PASTEL PALETTE (Light Sea Green PRIMARY)
+ * PASTEL PALETTE (Light Sea Green PRIMARY) + COLLAPSIBLE SIDEBAR
  */
 
 /* ============================================
-   GENERAL STYLES
+   CSS VARIABLES
    ============================================ */
 :root {
+    /* Color Palette */
     --primary-color: #129A7D; /* Light Sea Green */
     --secondary-color: #9BD3CB; /* Light Steel Blue */
     --danger-color: #F39CA4; /* Light Coral */
     --warning-color: #FCBCBC; /* Light Pink */
     --info-color: #FADAE2; /* Antique White */
-    --success-color: #A0DCC2; /* Soft Mint (hasil turunan) */
-
+    --success-color: #A0DCC2; /* Soft Mint */
     --dark-color: #0E6F57; /* Darkened Sea Green */
     --light-color: #FFFAFC; /* Pastel White */
+    /* Sidebar Variables */
+    --sidebar-width: 260px;
+    --sidebar-collapsed-width: 60px;
+    --sidebar-bg: #1a1a2e;
+    --sidebar-hover: #2a2a3e;
+    --sidebar-active: #3a3a4e;
+    --sidebar-text: #e0e0e0;
+    --sidebar-text-secondary: #999;
+    --transition-speed: 0.3s;
+}
+
+/* ============================================
+   RESET & GENERAL STYLES
+   ============================================ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    height: 100%;
 }
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: var(--light-color);
+    background-color: #f5f5f5;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-}
-html {
-    height: 100%;
 }
 
 .main-container {
@@ -35,7 +54,244 @@ html {
 }
 
 /* ============================================
-   NAVBAR
+   SIDEBAR TOGGLE BUTTON
+   ============================================ */
+.sidebar-toggle {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1100;
+    background: var(--sidebar-bg);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-speed) ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+    .sidebar-toggle:hover {
+        background: var(--sidebar-hover);
+        transform: scale(1.05);
+    }
+
+    .sidebar-toggle i {
+        font-size: 20px;
+    }
+
+/* ============================================
+   SIDEBAR MAIN
+   ============================================ */
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    width: var(--sidebar-width);
+    background: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    transition: all var(--transition-speed) ease;
+    overflow-x: hidden;
+    overflow-y: auto;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+    .sidebar::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .sidebar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 3px;
+    }
+
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+    /* Sidebar Collapsed State */
+    .sidebar.collapsed {
+        width: var(--sidebar-collapsed-width);
+    }
+
+        .sidebar.collapsed .sidebar-text {
+            opacity: 0;
+            width: 0;
+            display: none;
+        }
+
+        .sidebar.collapsed .dropdown-arrow {
+            display: none;
+        }
+
+        .sidebar.collapsed .sidebar-brand {
+            justify-content: center;
+        }
+
+        .sidebar.collapsed .sidebar-submenu {
+            display: none;
+        }
+
+/* ============================================
+   SIDEBAR HEADER
+   ============================================ */
+.sidebar-header {
+    padding: 20px 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 20px;
+    font-weight: 600;
+    color: white;
+    transition: all var(--transition-speed) ease;
+}
+
+    .sidebar-brand i {
+        font-size: 24px;
+        min-width: 24px;
+    }
+
+/* ============================================
+   SIDEBAR MENU
+   ============================================ */
+.sidebar-menu {
+    flex: 1;
+    padding: 15px 0;
+    overflow-y: auto;
+}
+
+.sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    color: var(--sidebar-text);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    position: relative;
+    white-space: nowrap;
+}
+
+    .sidebar-item i {
+        font-size: 18px;
+        min-width: 20px;
+    }
+
+    .sidebar-item:hover {
+        background: var(--sidebar-hover);
+        color: white;
+    }
+
+    .sidebar-item.active {
+        background: var(--sidebar-active);
+        color: white;
+        border-left: 3px solid #4CAF50;
+    }
+
+    .sidebar-item .dropdown-arrow {
+        margin-left: auto;
+        transition: transform 0.3s ease;
+        font-size: 14px;
+    }
+
+.sidebar-dropdown > a.active .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+/* ============================================
+   SIDEBAR SUBMENU
+   ============================================ */
+.sidebar-submenu {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+    .sidebar-submenu.active {
+        max-height: 500px;
+    }
+
+.sidebar-subitem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px 10px 50px;
+    color: var(--sidebar-text-secondary);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+    .sidebar-subitem i {
+        font-size: 16px;
+        min-width: 16px;
+    }
+
+    .sidebar-subitem:hover {
+        background: var(--sidebar-hover);
+        color: white;
+    }
+
+    .sidebar-subitem.text-warning {
+        color: #ffc107;
+    }
+
+    .sidebar-subitem.text-danger {
+        color: #dc3545;
+    }
+
+.sidebar-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 8px 15px;
+}
+
+/* ============================================
+   SIDEBAR FOOTER
+   ============================================ */
+.sidebar-footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 15px 0;
+}
+
+/* ============================================
+   MAIN CONTENT AREA
+   ============================================ */
+.main-content {
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
+    transition: all var(--transition-speed) ease;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+    .main-content.expanded {
+        margin-left: var(--sidebar-collapsed-width);
+        width: calc(100% - var(--sidebar-collapsed-width));
+    }
+
+/* ============================================
+   NAVBAR (for non-sidebar layouts)
    ============================================ */
 .navbar {
     box-shadow: 0 2px 4px rgba(0,0,0,0.08);
@@ -63,6 +319,26 @@ html {
     }
 
 /* ============================================
+   HEADER
+   ============================================ */
+header {
+    position: sticky;
+    top: 0;
+    z-index: 900;
+    background: white;
+    padding: 15px 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   CONTENT
+   ============================================ */
+#content {
+    flex: 1;
+    padding: 20px;
+}
+
+/* ============================================
    DROPDOWN
    ============================================ */
 .dropdown-menu {
@@ -83,7 +359,7 @@ html {
     border: none;
     border-radius: 10px;
     background: white;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     margin-bottom: 20px;
     transition: 0.2s;
 }
@@ -98,6 +374,7 @@ html {
     color: white;
     border-radius: 10px 10px 0 0 !important;
     font-weight: 600;
+    border-bottom: 2px solid #f0f0f0;
 }
 
 /* Dashboard Cards */
@@ -128,12 +405,12 @@ html {
     border-radius: 6px;
     padding: 8px 20px;
     font-weight: 500;
-    transition: 0.2s;
+    transition: all 0.2s ease;
 }
 
     .btn:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
     }
 
 .btn-primary {
@@ -172,6 +449,7 @@ html {
 .table {
     background: white;
     border-radius: 8px;
+    margin-bottom: 0;
 }
 
     .table thead th {
@@ -213,6 +491,9 @@ html {
     border-radius: 8px;
     padding: 15px 20px;
     border-left: 4px solid;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    animation: slideIn 0.3s ease;
 }
 
 .alert-success {
@@ -236,24 +517,81 @@ html {
 }
 
 /* ============================================
+   BADGE
+   ============================================ */
+.badge {
+    padding: 4px 8px;
+    font-weight: 500;
+}
+
+/* ============================================
    FOOTER
    ============================================ */
 footer {
     background-color: var(--primary-color);
     color: white;
-    padding: 20px 0;
+    padding: 20px;
     margin-top: auto;
+    border-top: 1px solid #e0e0e0;
+    text-align: center;
 }
 
 /* ============================================
-   RESPONSIVE
+   ANIMATIONS
+   ============================================ */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
    ============================================ */
 @media (max-width: 768px) {
     .dashboard-card .icon {
         font-size: 2rem;
     }
+
+    .sidebar {
+        transform: translateX(-100%);
+    }
+
+        .sidebar.collapsed {
+            transform: translateX(0);
+            width: var(--sidebar-collapsed-width);
+        }
+
+    .main-content {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .sidebar-toggle {
+        left: auto;
+        right: 15px;
+    }
 }
 
-#content {
-    flex: 1;
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+    .sidebar,
+    .sidebar-toggle,
+    header,
+    footer {
+        display: none !important;
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
 }

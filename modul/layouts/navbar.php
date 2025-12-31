@@ -1,162 +1,252 @@
 <?php
 /**
- * NAVBAR UNTUK ADMIN
+ * SIDEBAR UNTUK ADMIN - Bisa dikecilkan seperti Claude
  * Step 5/64 (7.8%)
  */
 $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
 ?>
-<nav class="navbar navbar-expand-lg navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="index.php">
-            <i class="bi bi-shop"></i> Rumah Makan
+
+<!-- Toggle Button (Floating) -->
+<button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
+    <i class="bi bi-list"></i>
+</button>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <div class="sidebar-brand">
+            <i class="bi bi-shop"></i>
+            <span class="sidebar-text">Rumah Makan</span>
+        </div>
+    </div>
+
+    <div class="sidebar-menu">
+        <!-- Dashboard -->
+        <a href="index.php?page=dashboard" class="sidebar-item <?php echo $current_page == 'dashboard' ? 'active' : ''; ?>">
+            <i class="bi bi-speedometer2"></i>
+            <span class="sidebar-text">Dashboard</span>
         </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav me-auto">
-                <!-- Dashboard -->
-                <li class="nav-item">
-                    <a class="nav-link <?php echo $current_page == 'dashboard' ? 'active' : ''; ?>" href="index.php?page=dashboard">
-                        <i class="bi bi-speedometer2"></i>
-                    </a>
-                </li>
 
-                <!-- Master Data -->
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-database"></i>
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="index.php?page=list_karyawan">
-                            <i class="bi bi-people"></i> Karyawan
-                        </a></li>
-                        <li><a class="dropdown-item" href="index.php?page=list_kategori">
-                            <i class="bi bi-tag"></i> Kategori Menu
-                        </a></li>
-                        <li><a class="dropdown-item" href="index.php?page=list_bahan">
-                            <i class="bi bi-box-seam"></i> Bahan Baku
-                        </a></li>
-                        <li><a class="dropdown-item" href="index.php?page=list_menu">
-                            <i class="bi bi-card-list"></i> Menu Makanan
-                        </a></li>
-                    </ul>
-                </li>
+        <!-- Master Data -->
+        <div class="sidebar-dropdown">
+            <a href="#" class="sidebar-item" onclick="toggleDropdown(event, 'masterData')">
+                <i class="bi bi-database"></i>
+                <span class="sidebar-text">Master Data</span>
+                <i class="bi bi-chevron-down dropdown-arrow"></i>
+            </a>
+            <div class="sidebar-submenu" id="masterData">
+                <a href="index.php?page=list_karyawan" class="sidebar-subitem">
+                    <i class="bi bi-people"></i>
+                    <span class="sidebar-text">Karyawan</span>
+                </a>
+                <a href="index.php?page=list_kategori" class="sidebar-subitem">
+                    <i class="bi bi-tag"></i>
+                    <span class="sidebar-text">Kategori Menu</span>
+                </a>
+                <a href="index.php?page=list_bahan" class="sidebar-subitem">
+                    <i class="bi bi-box-seam"></i>
+                    <span class="sidebar-text">Bahan Baku</span>
+                </a>
+                <a href="index.php?page=list_menu" class="sidebar-subitem">
+                    <i class="bi bi-card-list"></i>
+                    <span class="sidebar-text">Menu Makanan</span>
+                </a>
+            </div>
+        </div>
 
-                <!-- Pembelian -->
-                <li class="nav-item">
-                    <a class="nav-link <?php echo $current_page == 'pembelian_bahan' ? 'active' : ''; ?>" href="index.php?page=pembelian_bahan">
-                        <i class="bi bi-cart-plus"></i>
-                    </a>
-                </li>
+        <!-- Pembelian -->
+        <a href="index.php?page=pembelian_bahan" class="sidebar-item <?php echo $current_page == 'pembelian_bahan' ? 'active' : ''; ?>">
+            <i class="bi bi-cart-plus"></i>
+            <span class="sidebar-text">Pembelian</span>
+        </a>
 
-                <!-- Transaksi -->
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-cash-coin"></i>
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="index.php?page=buat_transaksi">
-                            <i class="bi bi-plus-circle"></i> Transaksi Baru
-                        </a></li>
-                        <li><a class="dropdown-item" href="index.php?page=list_transaksi">
-                            <i class="bi bi-list-ul"></i> Daftar Transaksi
-                        </a></li>
-                    </ul>
-                </li>
+        <!-- Transaksi -->
+        <div class="sidebar-dropdown">
+            <a href="#" class="sidebar-item" onclick="toggleDropdown(event, 'transaksi')">
+                <i class="bi bi-cash-coin"></i>
+                <span class="sidebar-text">Transaksi</span>
+                <i class="bi bi-chevron-down dropdown-arrow"></i>
+            </a>
+            <div class="sidebar-submenu" id="transaksi">
+                <a href="index.php?page=buat_transaksi" class="sidebar-subitem">
+                    <i class="bi bi-plus-circle"></i>
+                    <span class="sidebar-text">Transaksi Baru</span>
+                </a>
+                <a href="index.php?page=list_transaksi" class="sidebar-subitem">
+                    <i class="bi bi-list-ul"></i>
+                    <span class="sidebar-text">Daftar Transaksi</span>
+                </a>
+            </div>
+        </div>
 
-                <!-- Stock Management -->
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-boxes"></i>
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="index.php?page=list_movement">
-                            <i class="bi bi-arrow-left-right"></i> Stock Movement
-                        </a></li>
-                        <li><a class="dropdown-item" href="index.php?page=list_opname">
-                            <i class="bi bi-clipboard-check"></i> Stock Opname
-                        </a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="index.php?page=tambah_opname">
-                            <i class="bi bi-plus-square"></i> Buat Opname Baru
-                          </a></li>
-                          <li><hr class="dropdown-divider"></li>
-                          <!-- TAMBAHKAN INI -->
-                          <li><a class="dropdown-item text-warning" href="index.php?page=generate_stock">
-                              <i class="bi bi-arrow-repeat"></i> Generate Stock
-                          </a></li>
-                      </ul>
-                  </li>
+        <!-- Stock Management -->
+        <div class="sidebar-dropdown">
+            <a href="#" class="sidebar-item" onclick="toggleDropdown(event, 'stock')">
+                <i class="bi bi-boxes"></i>
+                <span class="sidebar-text">Stock</span>
+                <i class="bi bi-chevron-down dropdown-arrow"></i>
+            </a>
+            <div class="sidebar-submenu" id="stock">
+                <a href="index.php?page=list_movement" class="sidebar-subitem">
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span class="sidebar-text">Stock Movement</span>
+                </a>
+                <a href="index.php?page=list_opname" class="sidebar-subitem">
+                    <i class="bi bi-clipboard-check"></i>
+                    <span class="sidebar-text">Stock Opname</span>
+                </a>
+                <a href="index.php?page=tambah_opname" class="sidebar-subitem">
+                    <i class="bi bi-plus-square"></i>
+                    <span class="sidebar-text">Buat Opname</span>
+                </a>
+                <div class="sidebar-divider"></div>
+                <a href="index.php?page=generate_stock" class="sidebar-subitem text-warning">
+                    <i class="bi bi-arrow-repeat"></i>
+                    <span class="sidebar-text">Generate Stock</span>
+                </a>
+            </div>
+        </div>
 
-                <!-- Kas -->
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-wallet2"></i>
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="index.php?page=dashboard_kas">
-                            <i class="bi bi-graph-up"></i> Dashboard Kas
-                        </a></li>
-                        <li><a class="dropdown-item" href="index.php?page=list_transaksi_kas">
-                            <i class="bi bi-list-check"></i> Transaksi Kas
-                        </a></li>
-                        <li><a class="dropdown-item" href="index.php?page=tambah_transaksi_kas">
-                            <i class="bi bi-plus-circle"></i> Input Manual
-                        </a></li>
-                        <li><a class="dropdown-item" href="index.php?page=rekonsiliasi_kas">
-                            <i class="bi bi-check2-square"></i> Rekonsiliasi
-                        </a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-warning" href="index.php?page=generate_kas">
-                            <i class="bi bi-arrow-repeat"></i> Generate Kas
-                        </a></li>
-                    </ul>
-                </li>
+        <!-- Kas -->
+        <div class="sidebar-dropdown">
+            <a href="#" class="sidebar-item" onclick="toggleDropdown(event, 'kas')">
+                <i class="bi bi-wallet2"></i>
+                <span class="sidebar-text">Kas</span>
+                <i class="bi bi-chevron-down dropdown-arrow"></i>
+            </a>
+            <div class="sidebar-submenu" id="kas">
+                <a href="index.php?page=dashboard_kas" class="sidebar-subitem">
+                    <i class="bi bi-graph-up"></i>
+                    <span class="sidebar-text">Dashboard Kas</span>
+                </a>
+                <a href="index.php?page=list_transaksi_kas" class="sidebar-subitem">
+                    <i class="bi bi-list-check"></i>
+                    <span class="sidebar-text">Transaksi Kas</span>
+                </a>
+                <a href="index.php?page=tambah_transaksi_kas" class="sidebar-subitem">
+                    <i class="bi bi-plus-circle"></i>
+                    <span class="sidebar-text">Input Manual</span>
+                </a>
+                <a href="index.php?page=rekonsiliasi_kas" class="sidebar-subitem">
+                    <i class="bi bi-check2-square"></i>
+                    <span class="sidebar-text">Rekonsiliasi</span>
+                </a>
+                <div class="sidebar-divider"></div>
+                <a href="index.php?page=generate_kas" class="sidebar-subitem text-warning">
+                    <i class="bi bi-arrow-repeat"></i>
+                    <span class="sidebar-text">Generate Kas</span>
+                </a>
+            </div>
+        </div>
 
-                <!-- Laporan -->
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-file-earmark-text"></i>
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="index.php?page=laporan_harian">
-                            <i class="bi bi-calendar-day"></i> Laporan Harian
-                        </a></li>
-                        <li><a class="dropdown-item" href="index.php?page=laporan_bulanan">
-                            <i class="bi bi-calendar-month"></i> Laporan Bulanan
-                        </a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="index.php?page=laporan_stok">
-                            <i class="bi bi-box"></i> Laporan Stok
-                        </a></li>
-                        <li><a class="dropdown-item" href="index.php?page=laporan_menu">
-                            <i class="bi bi-graph-up-arrow"></i> Laporan Menu
-                        </a></li>
-                        <li><a class="dropdown-item" href="index.php?page=laporan_kas">
-                            <i class="bi bi-cash-stack"></i> Laporan Kas
-                        </a></li>
-                    </ul>
-                </li>
-            </ul>
+        <!-- Laporan -->
+        <div class="sidebar-dropdown">
+            <a href="#" class="sidebar-item" onclick="toggleDropdown(event, 'laporan')">
+                <i class="bi bi-file-earmark-text"></i>
+                <span class="sidebar-text">Laporan</span>
+                <i class="bi bi-chevron-down dropdown-arrow"></i>
+            </a>
+            <div class="sidebar-submenu" id="laporan">
+                <a href="index.php?page=laporan_harian" class="sidebar-subitem">
+                    <i class="bi bi-calendar-day"></i>
+                    <span class="sidebar-text">Laporan Harian</span>
+                </a>
+                <a href="index.php?page=laporan_bulanan" class="sidebar-subitem">
+                    <i class="bi bi-calendar-month"></i>
+                    <span class="sidebar-text">Laporan Bulanan</span>
+                </a>
+                <div class="sidebar-divider"></div>
+                <a href="index.php?page=laporan_stok" class="sidebar-subitem">
+                    <i class="bi bi-box"></i>
+                    <span class="sidebar-text">Laporan Stok</span>
+                </a>
+                <a href="index.php?page=laporan_menu" class="sidebar-subitem">
+                    <i class="bi bi-graph-up-arrow"></i>
+                    <span class="sidebar-text">Laporan Menu</span>
+                </a>
+                <a href="index.php?page=laporan_kas" class="sidebar-subitem">
+                    <i class="bi bi-cash-stack"></i>
+                    <span class="sidebar-text">Laporan Kas</span>
+                </a>
+            </div>
+        </div>
+    </div>
 
-            <!-- User Info -->
-            <ul class="navbar-nav">
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-person-circle"></i> <?php echo $_SESSION['nama_lengkap']; ?> (Admin)
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="index.php?page=profile">
-                            <i class="bi bi-person"></i> Profil
-                        </a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="config/auth_proses.php?action=logout">
-                            <i class="bi bi-box-arrow-right"></i> Logout
-                        </a></li>
-                    </ul>
-                </li>
-            </ul>
+    <!-- User Info di bawah -->
+    <div class="sidebar-footer">
+        <div class="sidebar-dropdown">
+            <a href="#" class="sidebar-item" onclick="toggleDropdown(event, 'userMenu')">
+                <i class="bi bi-person-circle"></i>
+                <span class="sidebar-text"><?php echo $_SESSION['nama_lengkap']; ?></span>
+                <i class="bi bi-chevron-down dropdown-arrow"></i>
+            </a>
+            <div class="sidebar-submenu" id="userMenu">
+                <a href="index.php?page=profile" class="sidebar-subitem">
+                    <i class="bi bi-person"></i>
+                    <span class="sidebar-text">Profil</span>
+                </a>
+                <div class="sidebar-divider"></div>
+                <a href="config/auth_proses.php?action=logout" class="sidebar-subitem text-danger">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span class="sidebar-text">Logout</span>
+                </a>
+            </div>
         </div>
     </div>
 </nav>
+
+<script>
+// Toggle Sidebar
+document.getElementById('sidebarToggle').addEventListener('click', function() {
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.querySelector('.main-content');
+    
+    sidebar.classList.toggle('collapsed');
+    mainContent.classList.toggle('expanded');
+    
+    // Simpan state di localStorage
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    localStorage.setItem('sidebarCollapsed', isCollapsed);
+});
+
+// Load saved state
+window.addEventListener('DOMContentLoaded', function() {
+    const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    if (isCollapsed) {
+        document.getElementById('sidebar').classList.add('collapsed');
+        document.querySelector('.main-content').classList.add('expanded');
+    }
+});
+
+// Toggle Dropdown
+function toggleDropdown(event, id) {
+    event.preventDefault();
+    const submenu = document.getElementById(id);
+    const sidebar = document.getElementById('sidebar');
+    const parentItem = event.currentTarget;
+    
+    // Jika sidebar collapsed, buka dulu sidebar
+    if (sidebar.classList.contains('collapsed')) {
+        sidebar.classList.remove('collapsed');
+        document.querySelector('.main-content').classList.remove('expanded');
+        localStorage.setItem('sidebarCollapsed', false);
+    }
+    
+    // Toggle submenu
+    const isActive = submenu.classList.contains('active');
+    
+    // Close all submenus
+    document.querySelectorAll('.sidebar-submenu').forEach(sm => {
+        sm.classList.remove('active');
+    });
+    document.querySelectorAll('.sidebar-dropdown > a').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Open clicked submenu if it was closed
+    if (!isActive) {
+        submenu.classList.add('active');
+        parentItem.classList.add('active');
+    }
+}
+</script>
