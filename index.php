@@ -26,6 +26,48 @@ if ($is_logged_in && $current_page == 'login') {
 
 // Ambil role user untuk access control
 $user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'karyawan';
+
+// VALIDASI AKSES ROLE SEBELUM RENDER - Mencegah headers already sent
+if ($is_logged_in) {
+    // Daftar halaman yang boleh diakses berdasarkan role
+    $admin_pages = [
+        'dashboard', 'list_karyawan', 'tambah_karyawan', 'edit_karyawan',
+        'list_kategori', 'tambah_kategori', 'edit_kategori',
+        'list_bahan', 'tambah_bahan', 'edit_bahan', 'pembelian_bahan', 'history_pembelian',
+        'list_menu', 'tambah_menu', 'edit_menu', 'detail_menu', 'resep_menu', 'tambah_resep',
+        'list_transaksi', 'buat_transaksi', 'detail_transaksi', 'struk_transaksi',
+        'list_movement', 'tambah_movement', 'detail_movement', 'laporan_movement',
+        'list_opname', 'tambah_opname', 'detail_opname', 'approval_opname', 'history_opname','generate_stock',
+        'dashboard_kas', 'list_transaksi_kas', 'tambah_transaksi_kas', 'detail_transaksi_kas', 'rekonsiliasi_kas', 'history_saldo', 'generate_kas',
+        'laporan_harian', 'laporan_bulanan', 'laporan_stok', 'laporan_menu', 'laporan_opname', 'laporan_kas',
+        'profile', 'pos'
+    ];
+
+    $karyawan_pages = [
+        'dashboard', 
+        'list_menu', 'detail_menu',
+        'list_bahan',
+        'list_transaksi', 'buat_transaksi', 'detail_transaksi', 'struk_transaksi',
+        'list_opname', 'tambah_opname', 'detail_opname',
+        'laporan_harian', 'laporan_stok',
+        'profile', 'pos'
+    ];
+
+    // Cek akses halaman
+    $allowed = false;
+    if ($user_role == 'admin') {
+        $allowed = in_array($current_page, $admin_pages);
+    } else {
+        $allowed = in_array($current_page, $karyawan_pages);
+    }
+
+    // Jika tidak punya akses, redirect ke dashboard SEBELUM ada output
+    if (!$allowed) {
+        $_SESSION['error'] = 'Anda tidak memiliki akses ke halaman tersebut!';
+        header('Location: index.php?page=dashboard');
+        exit;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -45,6 +87,44 @@ $user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'karyawan';
     
     <!-- Chart.js untuk grafik (optional) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Define toggleDropdown function BEFORE body loads -->
+    <script>
+        // Toggle Dropdown Function - Must be defined before HTML uses it
+        function toggleDropdown(event, id) {
+            event.preventDefault();
+            const submenu = document.getElementById(id);
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.querySelector('.main-content');
+            const parentItem = event.currentTarget;
+            
+            // Jika sidebar collapsed, buka dulu sidebar
+            if (sidebar && sidebar.classList.contains('collapsed')) {
+                sidebar.classList.remove('collapsed');
+                if (mainContent) {
+                    mainContent.classList.remove('expanded');
+                }
+                localStorage.setItem('sidebarCollapsed', false);
+            }
+            
+            // Toggle submenu
+            const isActive = submenu.classList.contains('active');
+            
+            // Close all submenus
+            document.querySelectorAll('.sidebar-submenu').forEach(sm => {
+                sm.classList.remove('active');
+            });
+            document.querySelectorAll('.sidebar-dropdown > a').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Open clicked submenu if it was closed
+            if (!isActive) {
+                submenu.classList.add('active');
+                parentItem.classList.add('active');
+            }
+        }
+    </script>
 </head>
 <body>
     <?php
@@ -83,6 +163,53 @@ $user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'karyawan';
     <!-- jQuery (untuk AJAX optional) -->
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     
+    <!-- Sidebar Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Toggle Sidebar
+            const toggleBtn = document.querySelector('.sidebar-toggle-btn');
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.querySelector('.main-content');
+
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Prevent sidebar click event
+                    sidebar.classList.toggle('collapsed');
+                    if (mainContent) {
+                        mainContent.classList.toggle('expanded');
+                    }
+                    
+                    // Simpan state di localStorage
+                    const isCollapsed = sidebar.classList.contains('collapsed');
+                    localStorage.setItem('sidebarCollapsed', isCollapsed);
+                });
+            }
+
+            // Click sidebar saat collapsed untuk expand
+            if (sidebar) {
+                sidebar.addEventListener('click', function(e) {
+                    if (this.classList.contains('collapsed')) {
+                        // Jangan expand jika klik menu item
+                        if (!e.target.closest('.sidebar-item') && !e.target.closest('.sidebar-subitem')) {
+                            this.classList.remove('collapsed');
+                            if (mainContent) {
+                                mainContent.classList.remove('expanded');
+                            }
+                            localStorage.setItem('sidebarCollapsed', false);
+                        }
+                    }
+                });
+            }
+
+            // Load saved state
+            const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            if (isCollapsed && sidebar && mainContent) {
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('expanded');
+            }
+        });
+    </script>
+    
     <!-- Custom JS -->
     <script>
         // Auto hide alert after 5 seconds
@@ -116,15 +243,6 @@ $user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'karyawan';
         // Print function
         function printPage() {
             window.print();
-        }
-
-        // Smooth scroll to content (optional, bisa dihapus jika tidak perlu)
-        window.onload = function() {
-            const target = document.getElementById('content'); 
-            if (target) {
-                // Tidak perlu scroll karena content sudah visible
-                console.log("Content loaded");
-            }
         }
     </script>
 </body>

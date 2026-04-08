@@ -2,52 +2,12 @@
 /**
  * CONTENT ROUTING
  * Step 8/64 (12.5%)
+ * 
+ * CATATAN: Validasi akses role sudah dilakukan di index.php SEBELUM navbar di-render
+ * File ini hanya bertugas untuk routing ke file yang tepat
  */
 
 $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
-$user_role = $_SESSION['role'];
-
-// Daftar halaman yang boleh diakses berdasarkan role
-$admin_pages = [
-    'dashboard', 'list_karyawan', 'tambah_karyawan', 'edit_karyawan',
-    'list_kategori', 'tambah_kategori', 'edit_kategori',
-    'list_bahan', 'tambah_bahan', 'edit_bahan', 'pembelian_bahan', 'history_pembelian',
-    'list_menu', 'tambah_menu', 'edit_menu', 'detail_menu', 'resep_menu', 'tambah_resep',
-    'list_transaksi', 'buat_transaksi', 'detail_transaksi', 'struk_transaksi',
-    'list_movement', 'tambah_movement', 'detail_movement', 'laporan_movement',
-    'list_opname', 'tambah_opname', 'detail_opname', 'approval_opname', 'history_opname','generate_stock',
-    'dashboard_kas', 'list_transaksi_kas', 'tambah_transaksi_kas', 'detail_transaksi_kas', 'rekonsiliasi_kas', 'history_saldo', 'generate_kas',
-    'laporan_harian', 'laporan_bulanan', 'laporan_stok', 'laporan_menu', 'laporan_opname', 'laporan_kas',
-    'profile'
-];
-
-$karyawan_pages = [
-    'dashboard', 
-    'list_menu', 'detail_menu',
-    'list_bahan',
-    'list_transaksi', 'buat_transaksi', 'detail_transaksi', 'struk_transaksi',
-    'list_opname', 'tambah_opname', 'detail_opname',
-    'laporan_harian', 'laporan_stok',
-    'profile'
-];
-
-// Cek akses halaman
-$allowed = false;
-if ($user_role == 'admin') {
-    $allowed = in_array($page, $admin_pages);
-} else {
-    $allowed = in_array($page, $karyawan_pages);
-}
-
-// Jika tidak punya akses, redirect ke dashboard
-if (!$allowed) {
-    $_SESSION['error'] = 'Anda tidak memiliki akses ke halaman tersebut!';
-    header('Location: index.php?page=dashboard');
-    exit;
-}
-
-// Include file halaman yang diminta
-$file_path = __DIR__ . '/../' . str_replace('_', '/', $page) . '.php';
 
 // Mapping untuk file yang tidak sesuai pattern
 $page_mapping = [
@@ -117,12 +77,17 @@ $page_mapping = [
     'laporan_kas' => 'laporan/laporan_kas.php',
     
     // Profile
-    'profile' => 'auth/profile.php'
+    'profile' => 'auth/profile.php',
+    
+    // POS
+    'pos' => 'pos/pos.php'
 ];
 
 // Cek apakah halaman ada di mapping
 if (isset($page_mapping[$page])) {
     $file_path = __DIR__ . '/../' . $page_mapping[$page];
+} else {
+    $file_path = __DIR__ . '/../' . str_replace('_', '/', $page) . '.php';
 }
 
 // Include file jika ada
@@ -137,4 +102,3 @@ if (file_exists($file_path)) {
     echo '<i class="bi bi-house"></i> Kembali ke Dashboard';
     echo '</a>';
 }
-?>
